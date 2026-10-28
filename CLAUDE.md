@@ -12,4 +12,13 @@ Página estática y pública de los pronósticos de [tesis-mlops](https://github
 - **El formato lo define `tesis-mlops`.** Está en `src/common/results_schema.py`, con su `version_esquema`. Si la página necesita un campo nuevo, se propone allá; aquí no se inventan campos. Si llega una `version_esquema` que la página no conoce, debe mostrar un mensaje claro en vez de dibujar datos mal.
 - **Varios pronósticos.** La página lee `manifest.json` y no asume que hay uno solo. Un producto con marcas reales queda fuera de este repo: necesitaría inicio de sesión y otro dueño.
 - **Métricas en el formato estándar:** WAPE y MAPE de mes 1, mes 2 y total, más el sesgo total.
-- **Workflows, cuando existan:** nada de `pull_request_target`, acciones fijadas por commit, permisos mínimos y los mismos criterios de seguridad que `tesis-mlops`.
+- **Workflows:** nada de `pull_request_target`, acciones fijadas por commit, permisos mínimos y los mismos criterios de seguridad que `tesis-mlops`. Hoy solo existe `ci.yml` (pruebas en cada PR); la página se publica desde `main` `/docs`, sin workflow de despliegue.
+- **Datos de ejemplo solo sintéticos.** Se generan con `herramientas/generar_ejemplo.py`, que los valida con el esquema de `tesis-mlops`; no se editan a mano. De `tesis-mlops` solo se lee: nunca se edita desde aquí.
+- **Sin dependencias.** HTML, CSS y JavaScript sin compilar. Chart.js va en `docs/vendor/` con versión fija y su licencia; las pruebas usan `node --test`.
+- **El texto de los datos nunca entra como HTML.** Se usa `textContent` o `append` con strings, nunca `innerHTML`. La política de seguridad de `index.html` solo deja cargar scripts y datos del propio sitio.
+
+## Comandos
+
+- `npm test`: pruebas de `docs/js/` con el ejemplo sintético.
+- `npm start`: sirve `docs/` en http://127.0.0.1:8000 para verla en local.
+- `python herramientas/generar_ejemplo.py`: regenera `docs/datos/ejemplo/` (necesita `../tesis-mlops`, pandas, numpy y jsonschema).
