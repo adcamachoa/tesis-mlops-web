@@ -1,0 +1,476 @@
+/* Diseño neutro: grises, un solo color para el pronóstico y la tipografía del sistema. Modo claro y oscuro según el
+   sistema operativo. Los colores de la gráfica salen de estas mismas variables (js/grafica.js). */
+
+:root {
+  color-scheme: light;
+  --fondo: #f9f9f7;
+  --superficie: #fcfcfb;
+  --texto: #0b0b0b;
+  --texto-2: #52514e;
+  --texto-suave: #898781;
+  --borde: rgba(11, 11, 11, 0.1);
+  --cuadricula: #e1e0d9;
+  --eje: #c3c2b7;
+  --enlace: #1c5cab;
+  --resaltado: rgba(42, 120, 214, 0.1);
+  --linea-real: #52514e;
+  --linea-pronostico: #2a78d6;
+  --linea-anterior: #898781;
+  --aviso-fondo: #fff4d6;
+  --aviso-borde: #fab219;
+  --error-borde: #d03b3b;
+  --radio: 8px;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --fondo: #0d0d0d;
+    --superficie: #1a1a19;
+    --texto: #f0efec;
+    --texto-2: #c3c2b7;
+    --texto-suave: #898781;
+    --borde: rgba(255, 255, 255, 0.1);
+    --cuadricula: #2c2c2a;
+    --eje: #383835;
+    --enlace: #86b6ef;
+    --resaltado: rgba(57, 135, 229, 0.18);
+    --linea-real: #a8a79f;
+    --linea-pronostico: #3987e5;
+    --linea-anterior: #76756f;
+    --aviso-fondo: #2e2510;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--enlace);
+}
+
+:focus-visible {
+  outline: 2px solid var(--linea-pronostico);
+  outline-offset: 2px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.contenedor {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Encabezado */
+
+.encabezado {
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
+}
+
+.encabezado-interior {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-top: 24px;
+  padding-bottom: 20px;
+}
+
+.antetitulo {
+  margin: 0;
+  color: var(--texto-2);
+  font-size: 0.875rem;
+}
+
+h1 {
+  margin: 4px 0;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  line-height: 1.2;
+}
+
+.bajada {
+  margin: 0;
+  color: var(--texto-2);
+}
+
+.selector-pronostico,
+.controles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+label {
+  color: var(--texto-2);
+  font-size: 0.875rem;
+}
+
+select {
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--eje);
+  border-radius: 6px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+}
+
+/* Avisos y estados */
+
+.aviso {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  max-width: 72rem;
+  margin: 16px auto 0;
+  padding: 10px 14px;
+  border: 1px solid var(--aviso-borde);
+  border-radius: var(--radio);
+  background: var(--aviso-fondo);
+}
+
+@media (max-width: calc(72rem + 32px)) {
+  .aviso {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+}
+
+.aviso-icono {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--aviso-borde);
+  color: #0b0b0b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.estado {
+  margin: 24px 0;
+  color: var(--texto-2);
+}
+
+.estado.error {
+  padding: 16px 20px;
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--error-borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--texto);
+}
+
+.estado.error h2 {
+  margin: 0 0 4px;
+  font-size: 1.125rem;
+}
+
+.estado.error p,
+.estado.error ul {
+  margin: 4px 0 0;
+}
+
+.estado.error li {
+  color: var(--texto-2);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.85rem;
+}
+
+/* Tarjetas */
+
+.contenido {
+  display: grid;
+  gap: 24px;
+  margin: 24px 0 40px;
+}
+
+.tarjeta {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+}
+
+.nota {
+  margin: 0 0 16px;
+  color: var(--texto-2);
+  font-size: 0.9rem;
+}
+
+code {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.9em;
+}
+
+/* Resumen */
+
+.resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+}
+
+.dato dt {
+  color: var(--texto-2);
+  font-size: 0.875rem;
+}
+
+.dato dd {
+  margin: 2px 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.dato .detalle {
+  display: block;
+  color: var(--texto-2);
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+/* Tablas */
+
+.desplazable {
+  overflow-x: auto;
+}
+
+.desplazable + .nota {
+  margin: 12px 0 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--cuadricula);
+  text-align: right;
+  white-space: nowrap;
+}
+
+thead th {
+  border-bottom-color: var(--eje);
+  color: var(--texto-2);
+  font-weight: 600;
+  vertical-align: bottom;
+}
+
+thead th[colspan] {
+  border-bottom-color: var(--cuadricula);
+  text-align: center;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+}
+
+td,
+.numero {
+  font-variant-numeric: tabular-nums;
+}
+
+tbody tr:last-child > * {
+  border-bottom: none;
+}
+
+.separador {
+  border-left: 1px solid var(--cuadricula);
+}
+
+.fila-champion > * {
+  background: var(--resaltado);
+}
+
+.etiqueta {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid var(--eje);
+  border-radius: 999px;
+  color: var(--texto-2);
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: 1px;
+}
+
+.etiqueta-champion {
+  border-color: var(--linea-pronostico);
+  color: var(--texto);
+}
+
+.subtitulo-columna {
+  display: block;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+tr.grupo th {
+  padding-top: 14px;
+  color: var(--texto-2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.boton-serie {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--enlace);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.boton-serie:hover {
+  text-decoration: underline;
+}
+
+tr[aria-current="true"] > * {
+  background: var(--resaltado);
+}
+
+tr[aria-current="true"] .boton-serie {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+details {
+  margin-top: 16px;
+}
+
+summary {
+  color: var(--enlace);
+  cursor: pointer;
+}
+
+details[open] summary {
+  margin-bottom: 8px;
+}
+
+/* Gráfica */
+
+.cifras {
+  margin: 12px 0 8px;
+  color: var(--texto-2);
+}
+
+.cifras strong {
+  color: var(--texto);
+}
+
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  color: var(--texto-2);
+  font-size: 0.875rem;
+}
+
+.leyenda li,
+.leyenda label {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.leyenda input {
+  margin: 0;
+}
+
+.muestra {
+  display: inline-block;
+  width: 24px;
+  border-top: 2px solid;
+}
+
+.muestra-real {
+  border-top-color: var(--linea-real);
+}
+
+.muestra-pronostico {
+  border-top-style: dashed;
+  border-top-color: var(--linea-pronostico);
+}
+
+.muestra-anterior {
+  border-top-style: dotted;
+  border-top-color: var(--linea-anterior);
+}
+
+.lienzo {
+  position: relative;
+  height: 360px;
+}
+
+.lienzo + .nota {
+  margin: 12px 0 0;
+}
+
+/* Pie */
+
+.pie {
+  padding: 20px 0 32px;
+  border-top: 1px solid var(--borde);
+  color: var(--texto-2);
+  font-size: 0.875rem;
+}
+
+.pie p {
+  margin: 4px 0;
+}
+
+@media (max-width: 600px) {
+  .tarjeta {
+    padding: 16px;
+  }
+
+  .lienzo {
+    height: 280px;
+  }
+
+  /* los nombres largos se parten para que se vean los números sin desplazar tanto */
+  .nombre-serie {
+    min-width: 10rem;
+    white-space: normal;
+  }
+}

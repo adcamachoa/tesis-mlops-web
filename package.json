@@ -1,0 +1,13 @@
+{
+  "name": "tesis-mlops-web",
+  "private": true,
+  "description": "Página estática de los pronósticos de tesis-mlops. Sin dependencias: solo Node para las pruebas.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node herramientas/servir.js",
+    "test": "node --test"
+  }
+}
