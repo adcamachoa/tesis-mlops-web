@@ -1,0 +1,38 @@
+# CI de cada pull request a main: las pruebas de la página con node --test.
+#
+# El repo es público, así que:
+# - Solo se usa pull_request, nunca pull_request_target: el código del PR corre sin secretos ni permisos de escritura.
+# - Este repo no tiene secretos, y el token de GitHub del job solo puede leer.
+# - Las acciones van fijadas por commit, no por etiqueta.
+# La página se publica desde main /docs con GitHub Pages; este workflow no despliega nada.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# un push nuevo al PR cancela la corrida anterior
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false  # que no quede el token de GitHub en .git/config
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: 22  # la misma versión mayor que en local
+          package-manager-cache: false  # no hay dependencias que guardar
+
+      # sin npm install: el repo no tiene dependencias
+      - name: Pruebas
+        run: node --test
