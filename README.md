@@ -77,14 +77,20 @@ Una barra bajo el encabezado, fija arriba en escritorio, tiene tres controles:
 - **Tema:** *Sistema*, *Claro* u *Oscuro*. Por defecto sigue al sistema operativo. La elección se guarda solo en el navegador de quien la hace (`localStorage`), y `js/tema.js` la aplica antes de dibujar la página para que no parpadee.
 
 1. **Resumen:** las cifras de la serie elegida en las 13 semanas pronosticadas (semana promedio del pronóstico, la del año anterior y la variación) y los datos de la corrida: modelo champion y versión, fecha del pronóstico, datos hasta, periodo pronosticado y backtest.
-2. **Modelos en el backtest:** el formato estándar (WAPE y MAPE de mes 1, mes 2 y total, más el sesgo total), con el champion y el mejor marcados. El complemento (WAPE tipo × mes, MAE y RMSE) va en un desplegable. Son las métricas del backtest completo a nivel tipo de producto y no cambian con la serie.
+2. **Modelos en el backtest:** WAPE de mes 1, mes 2 y total, más el sesgo total, con el champion y el mejor marcados. El complemento (WAPE tipo × mes, MAE y RMSE) va en un desplegable. Son las métricas del backtest completo a nivel tipo de producto y no cambian con la serie. El MAPE viene en `results.json`, pero la página no lo muestra.
 3. **Venta real y pronóstico** de la serie elegida: 52 semanas reales, 13 de pronóstico y las mismas semanas del año anterior. Abajo hay una tabla con los datos de la gráfica, en índice.
 4. **Pronóstico por mes** de la serie elegida, contraído por defecto (se abre con un clic en el título): cada mes como semana promedio en índice (el pronóstico del periodo entre sus días, por 7) y el trimestre contra el año anterior, en %. Debajo va el desglose, y al elegir una fila toda la página pasa a esa serie.
    - **Total:** se desglosa en sus submarcas, que lo suman.
    - **Submarca:** se desglosa en sus series principales más "Otras series", que es la submarca menos esas series, porque `results.json` solo trae las 20 de más venta.
    - **Serie:** no se desglosa.
 
-Mientras use el ejemplo, la página muestra un aviso de datos sintéticos.
+**Exportar a Excel.** Cada tabla tiene un botón que la descarga como `.xlsx`. Las tablas son modelos, métricas complementarias, datos de la gráfica y pronóstico por mes.
+
+- **Qué trae cada archivo:** una hoja con las mismas columnas de la página, con los números como números y su formato (índice, %, fechas), y una hoja "Notas" con la tabla, la serie, el pronóstico, la escala y la fuente.
+- **Serie elegida:** las tablas de la gráfica y del pronóstico por mes salen de la serie elegida.
+- **Sin dependencias:** el archivo se arma en el navegador con `js/xlsx.js`.
+
+Mientras use el ejemplo, la página muestra un aviso de datos sintéticos, y los archivos exportados lo repiten en sus notas.
 
 ## Estructura
 
@@ -97,6 +103,8 @@ docs/                       lo que publica GitHub Pages (main, carpeta /docs)
   js/grafica.js             la gráfica con Chart.js
   js/app.js                 arranque, segmentador, selector de pronóstico y tema
   js/tema.js                aplica el tema guardado antes de dibujar la página
+  js/exportar.js            arma cada tabla para Excel (sin DOM, con pruebas)
+  js/xlsx.js                escribe el .xlsx: un ZIP con las hojas XML (sin DOM, con pruebas)
   vendor/                   Chart.js 4.5.1 y su licencia
   datos/ejemplo/            manifest.json y un results.json sintético por origen
 herramientas/
