@@ -72,8 +72,8 @@
           results.json todavía no trae métricas por serie.
         </p>
         <p class="nota">
-          En WAPE y MAPE, menor es mejor. El sesgo es positivo si el modelo pronosticó de más. <em>Mejor</em> es el de
-          menor WAPE tipo × mes; el <em>champion</em> es el modelo que hizo este pronóstico.
+          En WAPE, menor es mejor. El sesgo es positivo si el modelo pronosticó de más. <em>Mejor</em> es el de menor
+          WAPE tipo × mes; el <em>champion</em> es el modelo que hizo este pronóstico.
         </p>
         <div id="modelos"></div>
       </section>
@@ -100,6 +100,7 @@
         <details>
           <summary>Ver los datos de la gráfica</summary>
           <div class="desplazable" id="datos-grafica"></div>
+          <div id="exportar-grafica"></div>
         </details>
       </section>
 
@@ -113,6 +114,7 @@
           columna contra el año anterior es la variación del trimestre, en %.
         </p>
         <div class="desplazable" id="meses" aria-describedby="unidad-meses"></div>
+        <div id="exportar-meses"></div>
         <p class="nota nota-abajo">
           Cada mes es un periodo de 31, 30 y 30 días desde el lunes siguiente al corte, no un mes del calendario. Se
           muestra como semana promedio (el pronóstico del periodo entre sus días, por 7) para comparar periodos de

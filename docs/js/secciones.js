@@ -1,10 +1,11 @@
 // Arma el resumen, las tablas y los mensajes de la página. Todo el texto que viene de los datos entra como texto
 // (append de strings), nunca como HTML.
 
-import { ErrorDatos, METRICAS_ESTANDAR, anioAnterior } from "./datos.js";
+import { ErrorDatos, anioAnterior } from "./datos.js";
 import { fecha, fechaCorta, indice, nombreDentroDe, nombreSerie, porcentaje, variacion } from "./formato.js";
 
 const MAXIMO_DETALLES = 8;
+const COLUMNAS_MODELOS = ["wape_m1", "wape_m2", "wape_total", "sesgo_total"]; // sin MAPE
 const CIEN = "100 = semana promedio del total";
 
 /** Un elemento con sus atributos (`clase` es className) y sus hijos; null y false se saltan. */
@@ -61,8 +62,18 @@ function nombreModelo(fila) {
   ];
 }
 
-/** La tabla de modelos en el formato estándar, y el complemento en un desplegable. */
-export function tablaModelos(metricas) {
+/** Una fila con el botón que exporta la tabla de arriba a Excel. */
+export function botonExportar(alExportar) {
+  const boton = el("button", { type: "button", clase: "boton-exportar" }, "Exportar a Excel (.xlsx)");
+  boton.addEventListener("click", alExportar);
+  return el("div", { clase: "exportar" }, boton);
+}
+
+/**
+ * La tabla de modelos (WAPE de mes 1, mes 2 y total, y sesgo total) y el complemento en un desplegable, cada una con
+ * su botón para exportar a Excel. El MAPE viene en results.json, pero la página no lo muestra.
+ */
+export function tablaModelos(metricas, { alExportar, alExportarComplemento }) {
   const grupo = (texto, columnas) => el("th", { scope: "colgroup", colspan: columnas, clase: "separador" }, texto);
   const columna = (texto, separador = false) => el("th", { scope: "col", clase: separador ? "separador" : null }, texto);
   const estandar = el(
@@ -71,20 +82,8 @@ export function tablaModelos(metricas) {
     el(
       "thead",
       {},
-      el(
-        "tr",
-        {},
-        el("th", { scope: "col", rowspan: 2 }, "Modelo"),
-        grupo("WAPE", 3),
-        grupo("MAPE (referencia)", 3),
-        grupo("Sesgo", 1),
-      ),
-      el(
-        "tr",
-        {},
-        ["WAPE", "MAPE"].flatMap(() => [columna("Mes 1", true), columna("Mes 2"), columna("Total")]),
-        columna("Total", true),
-      ),
+      el("tr", {}, el("th", { scope: "col", rowspan: 2 }, "Modelo"), grupo("WAPE", 3), grupo("Sesgo", 1)),
+      el("tr", {}, columna("Mes 1", true), columna("Mes 2"), columna("Total"), columna("Total", true)),
     ),
     el(
       "tbody",
@@ -94,9 +93,9 @@ export function tablaModelos(metricas) {
           "tr",
           { clase: fila.es_champion ? "fila-champion" : null },
           el("th", { scope: "row" }, nombreModelo(fila)),
-          METRICAS_ESTANDAR.map((metrica, i) =>
+          COLUMNAS_MODELOS.map((metrica, i) =>
             celdaMetrica(fila[metrica], metrica === "sesgo_total" ? variacion : porcentaje, {
-              clase: i % 3 === 0 ? "separador" : null,
+              clase: i === 0 || metrica === "sesgo_total" ? "separador" : null,
             }),
           ),
         ),
@@ -152,8 +151,9 @@ export function tablaModelos(metricas) {
         ),
       ),
     ),
+    botonExportar(alExportarComplemento),
   );
-  return [el("div", { clase: "desplazable" }, estandar), nota, complemento].filter(Boolean);
+  return [el("div", { clase: "desplazable" }, estandar), botonExportar(alExportar), nota, complemento].filter(Boolean);
 }
 
 /** Los botones del segmentador: el total y cada submarca. Cada uno lleva su serie en data-serie. */
