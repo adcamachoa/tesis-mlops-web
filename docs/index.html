@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="Pronóstico de demanda semanal de la tesis de maestría en MLOps: modelo champion, comparación de modelos y pronóstico por serie y por mes.">
+  <title>Pronóstico de demanda · Tesis MLOps</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="estilos.css">
+  <script src="vendor/chart.umd.min.js" defer></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="encabezado">
+    <div class="contenedor encabezado-interior">
+      <div>
+        <p class="antetitulo">Tesis de maestría · MLOps</p>
+        <h1>Pronóstico de demanda semanal</h1>
+        <p class="bajada">Venta semanal pronosticada a 13 semanas con el modelo champion, elegido en un backtest.</p>
+      </div>
+      <div class="selector-pronostico" id="selector-pronostico" hidden>
+        <label for="pronostico">Pronóstico</label>
+        <select id="pronostico"></select>
+      </div>
+    </div>
+  </header>
+
+  <p class="aviso" id="aviso-sinteticos" role="note" hidden>
+    <span class="aviso-icono" aria-hidden="true">!</span>
+    <span><strong>Datos sintéticos de ejemplo.</strong> No son pronósticos reales: sirven para probar la página.</span>
+  </p>
+
+  <main class="contenedor">
+    <noscript><p class="estado">Esta página necesita JavaScript para mostrar los pronósticos.</p></noscript>
+    <div class="estado" id="estado" role="status" aria-live="polite">Cargando el pronóstico…</div>
+
+    <div class="contenido" id="contenido" hidden>
+      <section class="tarjeta" aria-labelledby="t-resumen">
+        <h2 id="t-resumen">Resumen</h2>
+        <div id="resumen"></div>
+      </section>
+
+      <section class="tarjeta" aria-labelledby="t-modelos">
+        <h2 id="t-modelos">Modelos en el backtest</h2>
+        <p class="nota">
+          Error de cada modelo en el backtest, a nivel tipo de producto. En WAPE y MAPE, menor es mejor. El sesgo es
+          positivo si el modelo pronosticó de más. <em>Mejor</em> es el de menor WAPE tipo × mes; el <em>champion</em>
+          es el modelo que hizo este pronóstico.
+        </p>
+        <div id="modelos"></div>
+      </section>
+
+      <section class="tarjeta" aria-labelledby="t-grafica" id="seccion-grafica">
+        <h2 id="t-grafica">Venta real y pronóstico</h2>
+        <div class="controles">
+          <label for="serie">Serie</label>
+          <select id="serie"></select>
+        </div>
+        <p class="cifras" id="cifras-serie"></p>
+        <ul class="leyenda">
+          <li><span class="muestra muestra-real" aria-hidden="true"></span>Venta real</li>
+          <li><span class="muestra muestra-pronostico" aria-hidden="true"></span>Pronóstico</li>
+          <li>
+            <label>
+              <input type="checkbox" id="ver-anio-anterior" checked>
+              <span class="muestra muestra-anterior" aria-hidden="true"></span>Mismas semanas del año anterior
+            </label>
+          </li>
+        </ul>
+        <div class="lienzo">
+          <canvas id="grafica" role="img" aria-label="Gráfica de la venta real y el pronóstico de la serie elegida"></canvas>
+        </div>
+        <p class="nota">
+          Índice: 100 es la venta semanal promedio del total en las 52 semanas reales que muestra la gráfica. Todas las
+          series usan esa misma escala: una serie en 5 vende el 5 % de una semana promedio del total.
+        </p>
+        <details>
+          <summary>Ver los datos de la gráfica</summary>
+          <div class="desplazable" id="datos-grafica"></div>
+        </details>
+      </section>
+
+      <section class="tarjeta" aria-labelledby="t-meses">
+        <h2 id="t-meses">Pronóstico por mes</h2>
+        <p class="nota">
+          Cada mes es un periodo de 31, 30 y 30 días desde el lunes siguiente al corte, no un mes del calendario. Se
+          muestra como semana promedio (el pronóstico del periodo entre sus días, por 7) para comparar periodos de
+          distinto largo en la misma escala de la gráfica. El año anterior se compara solo en el trimestre: la venta real
+          viene por semana y dos semanas quedan partidas entre dos meses. Elige una fila para verla en la gráfica.
+        </p>
+        <div class="desplazable" id="meses"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="pie">
+    <div class="contenedor">
+      <p id="pie-escala"></p>
+      <p id="pie-generado"></p>
+      <p>
+        Pipeline y modelos en <a href="https://github.com/adcamachoa/tesis-mlops">tesis-mlops</a>;
+        esta página en <a href="https://github.com/adcamachoa/tesis-mlops-web">tesis-mlops-web</a>.
+      </p>
+    </div>
+  </footer>
+</body>
+</html>
