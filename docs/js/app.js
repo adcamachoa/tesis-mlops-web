@@ -1,39 +1,48 @@
 // Arranque de la página: lee manifest.json, arma la barra (segmentador de serie, pronóstico y tema) y muestra el
 // pronóstico elegido. La dirección de la página guarda el pronóstico (…/#2026-10-12), así que un enlace abre ese mismo
-// pronóstico. La serie elegida filtra toda la página, salvo la tabla de modelos, que results.json solo trae para el
-// backtest completo.
+// pronóstico. La serie elegida (un nodo del árbol) filtra toda la página, salvo la comparación oficial de modelos, que
+// es la del backtest completo. Al cambiar de pronóstico se mantiene la serie por su id o, si el nuevo no la publica por
+// separado, se muestra su grupo más cercano con un aviso.
 
-import { DATOS } from "../config.js?v=89e9a5fa";
+import { DATOS } from "../config.js?v=06557bc6";
 import {
   ErrorDatos,
+  arbol,
+  conservarNodo,
   desglose,
   elegirPronostico,
   filaPorMes,
-  jerarquia,
+  metricasDelNodo,
   revisarManifest,
   revisarResultados,
   tienePronosticoAnterior,
   tieneVentaReal,
-  ubicar,
   urlPronostico,
-} from "./datos.js?v=89e9a5fa";
-import { exportarComplemento, exportarGrafica, exportarModelos, exportarPorMes } from "./exportar.js?v=89e9a5fa";
-import { fecha, nombreSerie } from "./formato.js?v=89e9a5fa";
-import { crearGrafica } from "./grafica.js?v=89e9a5fa";
-import { TIPO_XLSX, libroXlsx } from "./xlsx.js?v=89e9a5fa";
+} from "./datos.js?v=06557bc6";
+import {
+  exportarComplemento,
+  exportarGrafica,
+  exportarModelos,
+  exportarModelosNodo,
+  exportarPorMes,
+} from "./exportar.js?v=06557bc6";
+import { cifra, enNivel, fecha, nombreSerie } from "./formato.js?v=06557bc6";
+import { crearGrafica } from "./grafica.js?v=06557bc6";
+import { TIPO_XLSX, libroXlsx } from "./xlsx.js?v=06557bc6";
 import {
   botonExportar,
   botonesSerie,
   el,
   etiquetaPronostico,
+  listasSerie,
   mensajeError,
-  opcionesDetalle,
   resumen,
   resumenSerie,
   tablaDatosGrafica,
   tablaModelos,
+  tablaModelosNodo,
   tablaPorMes,
-} from "./secciones.js?v=89e9a5fa";
+} from "./secciones.js?v=06557bc6";
 
 const $ = (id) => document.getElementById(id);
 const URL_MANIFEST = new URL("manifest.json", new URL(DATOS.url, document.baseURI));
@@ -42,7 +51,7 @@ const TEMAS = ["sistema", "claro", "oscuro"];
 
 let entradas = [];
 let pedido = 0; // si se cambia de pronóstico antes de que llegue el anterior, la respuesta vieja se descarta
-let actual = null; // { resultados, arbol, serie }
+let actual = null; // { resultados, arbol, id }: el pronóstico en pantalla, su árbol y el id del nodo elegido
 let grafica = null;
 
 async function leerJson(url, que) {
@@ -109,6 +118,7 @@ function mostrarEstado(hijos, esError = false) {
   estado.hidden = false;
   $("contenido").hidden = true;
   $("selector-serie").hidden = true; // sin pronóstico en pantalla no hay series que elegir
+  $("aviso-nodo").hidden = true;
 }
 
 function mostrarError(error) {
@@ -155,10 +165,24 @@ async function abrir(id) {
   }
 }
 
+/** El aviso de que la serie elegida no se publica por separado en este pronóstico y se muestra su grupo. */
+function avisarNodo(anterior, mostrado, resultados) {
+  $("aviso-nodo-texto").textContent =
+    `${nombreSerie(anterior.nombre)} no se publica por separado en el pronóstico del ` +
+    `${fecha(resultados.corrida.origen)}: se muestra ${nombreSerie(mostrado.nombre)}, ` +
+    "el grupo más cercano que sí está.";
+  $("aviso-nodo").hidden = false;
+}
+
 function mostrar(resultados) {
-  // al cambiar de pronóstico se conserva la serie elegida, si también está en el nuevo
-  const serie = resultados.series.find((s) => s.nombre === actual?.serie) ?? resultados.series.find((s) => s.nivel === "total");
-  actual = { resultados, arbol: jerarquia(resultados.series), serie: serie.nombre };
+  const nuevo = arbol(resultados);
+  const { id, movido } = actual ? conservarNodo(actual.arbol, actual.id, nuevo) : { id: nuevo.raiz.id, movido: false };
+  if (movido) avisarNodo(actual.arbol.nodo(actual.id), nuevo.nodo(id), resultados);
+  actual = { resultados, arbol: nuevo, id };
+  const version = String(resultados.version_esquema);
+  for (const elemento of document.querySelectorAll("[data-version]")) {
+    elemento.hidden = elemento.dataset.version !== version;
+  }
   $("resumen").replaceChildren(resumen(resultados));
   $("modelos").replaceChildren(
     ...tablaModelos(resultados.metricas, {
@@ -166,71 +190,82 @@ function mostrar(resultados) {
       alExportarComplemento: () => descargar(exportarComplemento(resultados, OPCIONES_EXPORTAR)),
     }),
   );
-  $("botones-serie").replaceChildren(...botonesSerie(actual.arbol, (nombre) => elegirSerie(nombre)));
+  $("botones-serie").replaceChildren(...botonesSerie(nuevo, (otro) => elegirSerie(otro)));
   // la venta real del horizonte y el pronóstico anterior solo vienen en los archivos nuevos
-  for (const id of ["leyenda-pronostico-anterior", "nota-pronostico-anterior"]) {
-    $(id).hidden = !tienePronosticoAnterior(resultados);
+  for (const elemento of ["leyenda-pronostico-anterior", "nota-pronostico-anterior"]) {
+    $(elemento).hidden = !tienePronosticoAnterior(resultados);
   }
   $("nota-venta-real").hidden = !tieneVentaReal(resultados);
   $("nota-real-meses").hidden = !tieneVentaReal(resultados);
+  if ("indice_minimo" in resultados) $("indice-minimo").textContent = cifra(resultados.indice_minimo);
   $("pie-escala").textContent = `Escala: ${resultados.escala}.`;
   $("pie-generado").textContent = `Datos generados el ${fecha(resultados.generado)}.`;
   $("estado").hidden = true;
   $("contenido").hidden = false;
   $("selector-serie").hidden = false;
-  elegirSerie(actual.serie);
+  mostrarSerie();
 }
 
-/** El segmentador marca el botón de la serie (o de su submarca) y, si tiene series, las ofrece en la lista. */
-function pintarSegmentador(nombre) {
-  const { arbol } = actual;
-  const { boton, lista, elegida } = ubicar(arbol, nombre);
-  for (const opcion of $("botones-serie").children) {
-    opcion.setAttribute("aria-pressed", String(opcion.dataset.serie === boton));
+/** El segmentador marca el botón de la submarca (o el total) de la serie elegida y arma las listas de su ruta. */
+function pintarSegmentador() {
+  const { arbol: elArbol, id } = actual;
+  const [raiz, primero = raiz] = elArbol.ruta(id);
+  for (const boton of $("botones-serie").children) {
+    boton.setAttribute("aria-pressed", String(boton.dataset.id === primero.id));
   }
-  const esTotal = boton === arbol.total.nombre;
-  $("selector-detalle").hidden = lista.length === 0;
-  $("t-detalle").textContent = esTotal ? "Otras series" : `Serie de ${boton}`;
-  $("serie-detalle").replaceChildren(...opcionesDetalle(boton, lista, esTotal).flat());
-  $("serie-detalle").value = elegida ?? boton;
+  $("listas-serie").replaceChildren(...listasSerie(elArbol, id, (otro) => elegirSerie(otro)));
 }
 
-function elegirSerie(nombre, desdeLaTabla = false) {
-  const { resultados } = actual;
-  const serie = resultados.series.find((s) => s.nombre === nombre);
-  const fila = filaPorMes(resultados, serie);
-  actual.serie = nombre;
-  pintarSegmentador(nombre);
-  $("serie-grafica").textContent = nombreSerie(nombre);
-  $("serie-meses").textContent = nombreSerie(nombre);
-  $("t-resumen-serie").textContent = `${nombreSerie(nombre)} · ${resultados.semanas.pronostico.length} semanas pronosticadas`;
-  $("resumen-serie").replaceChildren(resumenSerie(fila, resultados));
-  grafica.mostrar(resultados, serie, {
-    anioAnterior: $("ver-anio-anterior").checked,
-    pronosticoAnterior: $("ver-pronostico-anterior").checked,
-  });
-  $("datos-grafica").replaceChildren(tablaDatosGrafica(resultados, serie));
-  $("exportar-grafica").replaceChildren(
-    botonExportar(() => descargar(exportarGrafica(resultados, serie, OPCIONES_EXPORTAR))),
-  );
-  const partes = desglose(resultados, serie).map((parte) => filaPorMes(resultados, parte));
-  $("meses").replaceChildren(tablaPorMes(fila, partes, resultados, (otra) => elegirSerie(otra, true)));
-  $("exportar-meses").replaceChildren(
-    botonExportar(() => descargar(exportarPorMes(resultados, fila, partes, OPCIONES_EXPORTAR))),
-  );
+/** Elegir una serie desde el segmentador o desde el desglose: el aviso de un cambio de pronóstico ya no aplica. */
+function elegirSerie(id, desdeLaTabla = false) {
+  actual.id = id;
+  $("aviso-nodo").hidden = true;
+  mostrarSerie();
   if (desdeLaTabla) {
     // la serie nueva queda en la primera fila de la vista por mes, con su propio desglose debajo
     $("seccion-meses").scrollIntoView({ behavior: SIN_MOVIMIENTO.matches ? "auto" : "smooth", block: "start" });
   }
 }
 
+/** Dibuja todo lo que depende de la serie elegida. */
+function mostrarSerie() {
+  const { resultados, arbol: elArbol, id } = actual;
+  const nodo = elArbol.nodo(id);
+  const fila = filaPorMes(resultados, nodo);
+  pintarSegmentador();
+  $("serie-grafica").textContent = nombreSerie(nodo.nombre);
+  $("serie-meses").textContent = nombreSerie(nodo.nombre);
+  const semanas = resultados.semanas.pronostico.length;
+  $("t-resumen-serie").textContent = `${nombreSerie(nodo.nombre)} · ${semanas} semanas pronosticadas`;
+  $("resumen-serie").replaceChildren(resumenSerie(fila, resultados));
+  const metricas = metricasDelNodo(resultados, nodo);
+  if (metricas) {
+    $("t-modelos-nodo").textContent = `En ${nombreSerie(nodo.nombre)} · ${enNivel(nodo.nivel)}`;
+    $("modelos-nodo").replaceChildren(
+      ...tablaModelosNodo(metricas, () => descargar(exportarModelosNodo(resultados, nodo, OPCIONES_EXPORTAR))),
+    );
+  }
+  grafica.mostrar(resultados, nodo, {
+    anioAnterior: $("ver-anio-anterior").checked,
+    pronosticoAnterior: $("ver-pronostico-anterior").checked,
+  });
+  $("datos-grafica").replaceChildren(tablaDatosGrafica(resultados, nodo));
+  $("exportar-grafica").replaceChildren(
+    botonExportar(() => descargar(exportarGrafica(resultados, nodo, OPCIONES_EXPORTAR))),
+  );
+  const partes = desglose(resultados, nodo).map((parte) => filaPorMes(resultados, parte));
+  $("meses").replaceChildren(tablaPorMes(fila, partes, resultados, (otro) => elegirSerie(otro, true)));
+  $("exportar-meses").replaceChildren(
+    botonExportar(() => descargar(exportarPorMes(resultados, fila, partes, OPCIONES_EXPORTAR))),
+  );
+}
+
 async function iniciar() {
   $("aviso-sinteticos").hidden = !DATOS.sinteticos;
   grafica = crearGrafica($("grafica"));
   prepararTema();
-  $("serie-detalle").addEventListener("change", (evento) => elegirSerie(evento.target.value));
   for (const casilla of ["ver-anio-anterior", "ver-pronostico-anterior"]) {
-    $(casilla).addEventListener("change", () => actual && elegirSerie(actual.serie));
+    $(casilla).addEventListener("change", () => actual && mostrarSerie());
   }
   try {
     entradas = revisarManifest(await leerJson(URL_MANIFEST, "la lista de pronósticos"));

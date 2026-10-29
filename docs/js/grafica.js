@@ -3,8 +3,8 @@
 // tiene su trazo: continua la venta real, a rayas el pronóstico, punteada el año anterior y de raya y punto, en un azul
 // más tenue, el pronóstico anterior. La venta real sigue después del corte en las semanas pronosticadas que ya cerraron.
 
-import { semanasGrafica } from "./datos.js?v=89e9a5fa";
-import { fecha, fechaCorta, indice, nombreSerie } from "./formato.js?v=89e9a5fa";
+import { semanasGrafica } from "./datos.js?v=06557bc6";
+import { fecha, fechaCorta, indice, nombreSerie } from "./formato.js?v=06557bc6";
 
 const FUENTE = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const OSCURO = window.matchMedia("(prefers-color-scheme: dark)");

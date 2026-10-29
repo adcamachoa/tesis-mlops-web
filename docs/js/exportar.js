@@ -1,8 +1,8 @@
 // Arma el contenido de cada tabla de la página para exportarla a Excel: las mismas columnas que se ven, con los números
 // como números (no como texto) y una hoja "Notas" con de dónde salen. Sin DOM: se prueba con node --test.
 
-import { semanasGrafica, tieneVentaReal } from "./datos.js?v=89e9a5fa";
-import { fecha, nombreSerie } from "./formato.js?v=89e9a5fa";
+import { metricasDelNodo, semanasGrafica, tieneVentaReal } from "./datos.js?v=06557bc6";
+import { cifra, enNivel, fecha, nombreSerie } from "./formato.js?v=06557bc6";
 
 const FUENTE = "https://github.com/adcamachoa/tesis-mlops-web";
 const indice = (valor) => ({ valor, formato: "indice" });
@@ -40,6 +40,10 @@ function notas(resultados, tabla, { serie = null, sinteticos = false } = {}) {
       tieneVentaReal(resultados) && ["Venta real hasta", fecha(resultados.real_hasta)],
       ["Modelo champion", `${champion.modelo} (versión ${champion.version})`],
       ["Escala", resultados.escala],
+      "indice_minimo" in resultados && [
+        "Mínimo publicado",
+        `${cifra(resultados.indice_minimo)} de índice promedio semanal: «Otras» junta lo que no se publica por separado`,
+      ],
       ["Generado", fecha(resultados.generado)],
       ["Fuente", FUENTE],
       sinteticos && ["Aviso", "Datos sintéticos de ejemplo: no son pronósticos reales."],
@@ -47,24 +51,46 @@ function notas(resultados, tabla, { serie = null, sinteticos = false } = {}) {
   };
 }
 
-/** La tabla de modelos: WAPE de mes 1, mes 2 y total, y sesgo total, del backtest completo. */
+const COLUMNAS_MODELOS = ["WAPE mes 1", "WAPE mes 2", "WAPE total", "Sesgo total"];
+const metricasModelo = (fila) => [
+  porcentaje(fila.wape_m1),
+  porcentaje(fila.wape_m2),
+  porcentaje(fila.wape_total),
+  variacion(fila.sesgo_total),
+];
+
+/** La comparación oficial de modelos: WAPE de mes 1, mes 2 y total, y sesgo total, del backtest completo. */
 export function exportarModelos(resultados, opciones = {}) {
   const filas = [
-    ["Modelo", "Champion", "Mejor", "WAPE mes 1", "WAPE mes 2", "WAPE total", "Sesgo total"],
+    ["Modelo", "Champion", "Mejor", ...COLUMNAS_MODELOS],
     ...resultados.metricas.map((fila) => [
       fila.modelo,
       fila.es_champion ? "sí" : "",
       fila.es_mejor ? "sí" : "",
-      porcentaje(fila.wape_m1),
-      porcentaje(fila.wape_m2),
-      porcentaje(fila.wape_total),
-      variacion(fila.sesgo_total),
+      ...metricasModelo(fila),
     ]),
   ];
   const tabla = "Modelos en el backtest completo, a nivel tipo de producto (no cambia con la serie)";
   return {
     archivo: archivo(["modelos-backtest"], resultados),
     hojas: [{ nombre: "Modelos", filas }, notas(resultados, tabla, opciones)],
+  };
+}
+
+/** La tabla de modelos medida en un nodo de la versión 2, con la venta y el pronóstico sumados a ese nodo. */
+export function exportarModelosNodo(resultados, nodo, opciones = {}) {
+  const filas = [
+    ["Modelo", "Champion", ...COLUMNAS_MODELOS],
+    ...metricasDelNodo(resultados, nodo).map((fila) => [
+      fila.modelo,
+      fila.es_champion ? "sí" : "",
+      ...metricasModelo(fila),
+    ]),
+  ];
+  const tabla = `Modelos en el backtest, medidos en la serie elegida (${enNivel(nodo.nivel)})`;
+  return {
+    archivo: archivo(["modelos", nodo.nombre], resultados),
+    hojas: [{ nombre: "Modelos", filas }, notas(resultados, tabla, { ...opciones, serie: nodo.nombre })],
   };
 }
 

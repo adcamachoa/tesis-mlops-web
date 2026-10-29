@@ -1,12 +1,16 @@
 // Arma el resumen, las tablas y los mensajes de la página. Todo el texto que viene de los datos entra como texto
 // (append de strings), nunca como HTML.
 
-import { ErrorDatos, semanasConVentaReal, semanasGrafica, tieneVentaReal } from "./datos.js?v=89e9a5fa";
-import { fecha, fechaCorta, indice, nombreDentroDe, nombreSerie, porcentaje, variacion } from "./formato.js?v=89e9a5fa";
+import { ErrorDatos, semanasConVentaReal, semanasGrafica, tieneVentaReal } from "./datos.js?v=06557bc6";
+import { fecha, fechaCorta, indice, nombreNivel, nombreSerie, porcentaje, variacion } from "./formato.js?v=06557bc6";
 
 const MAXIMO_DETALLES = 8;
 const COLUMNAS_MODELOS = ["wape_m1", "wape_m2", "wape_total", "sesgo_total"]; // sin MAPE
 const CIEN = "100 = semana promedio del total";
+// la primera opción de cada lista del segmentador: el nodo entero
+const TODO = { submarca: "Toda la submarca", departamento: "Todo el departamento", categoria: "Toda la categoría" };
+// el título de cada lista del segmentador, por el nivel de las opciones
+const LISTA = { submarca: "Submarca", departamento: "Departamento", categoria: "Categoría", serie: "Tipo de producto" };
 
 /** Un elemento con sus atributos (`clase` es className) y sus hijos; null y false se saltan. */
 export function el(etiqueta, atributos = {}, ...hijos) {
@@ -81,14 +85,11 @@ export function botonExportar(alExportar) {
   return el("div", { clase: "exportar" }, boton);
 }
 
-/**
- * La tabla de modelos (WAPE de mes 1, mes 2 y total, y sesgo total) y el complemento en un desplegable, cada una con
- * su botón para exportar a Excel. El MAPE viene en results.json, pero la página no lo muestra.
- */
-export function tablaModelos(metricas, { alExportar, alExportarComplemento }) {
+/** WAPE de mes 1, mes 2 y total, y sesgo total, de cada modelo. El MAPE viene en results.json, pero no se muestra. */
+function tablaEstandar(metricas) {
   const grupo = (texto, columnas) => el("th", { scope: "colgroup", colspan: columnas, clase: "separador" }, texto);
   const columna = (texto, separador = false) => el("th", { scope: "col", clase: separador ? "separador" : null }, texto);
-  const estandar = el(
+  return el(
     "table",
     {},
     el(
@@ -114,7 +115,14 @@ export function tablaModelos(metricas, { alExportar, alExportarComplemento }) {
       ),
     ),
   );
+}
 
+/**
+ * La tabla de modelos de la raíz, la comparación oficial (con el mejor y el champion), y el complemento en un
+ * desplegable, cada una con su botón para exportar a Excel.
+ */
+export function tablaModelos(metricas, { alExportar, alExportarComplemento }) {
+  const estandar = tablaEstandar(metricas);
   const champion = metricas.find((fila) => fila.es_champion);
   const nota =
     champion && !champion.es_mejor
@@ -168,21 +176,43 @@ export function tablaModelos(metricas, { alExportar, alExportarComplemento }) {
   return [el("div", { clase: "desplazable" }, estandar), botonExportar(alExportar), nota, complemento].filter(Boolean);
 }
 
-/** Los botones del segmentador: el total y cada submarca. Cada uno lleva su serie en data-serie. */
+/** La tabla de modelos medida en el nodo elegido (de metricasDelNodo), con su botón para exportar a Excel. */
+export function tablaModelosNodo(metricas, alExportar) {
+  return [el("div", { clase: "desplazable" }, tablaEstandar(metricas)), botonExportar(alExportar)];
+}
+
+/** Los botones del segmentador: el total y sus hijos (las submarcas). Cada uno lleva el id de su nodo en data-id. */
 export function botonesSerie(arbol, alElegir) {
-  return [arbol.total, ...arbol.submarcas.map((s) => s.serie)].map((serie) => {
-    const boton = el("button", { type: "button", clase: "boton-segmento", "data-serie": serie.nombre }, serie.nombre);
-    boton.addEventListener("click", () => alElegir(serie.nombre));
+  return [arbol.raiz, ...arbol.hijos(arbol.raiz.id)].map((nodo) => {
+    const atributos = { type: "button", clase: "boton-segmento", "data-id": nodo.id };
+    const boton = el("button", atributos, nombreSerie(nodo.etiqueta));
+    boton.addEventListener("click", () => alElegir(nodo.id));
     return boton;
   });
 }
 
-/** Las opciones de la lista del segmentador: el botón activo entero y, debajo, sus series sin repetir su nombre. */
-export function opcionesDetalle(boton, lista, esTotal) {
-  return [
-    el("option", { value: boton }, esTotal ? "Todo el total" : "Toda la submarca"),
-    lista.map((serie) => el("option", { value: serie.nombre }, nombreDentroDe(serie.nombre, boton))),
-  ];
+/**
+ * Las listas del segmentador, debajo de los botones: una por cada nodo de la ruta del nodo `id` que tiene hijos, desde
+ * la submarca, con el nodo entero primero y sus hijos debajo. Elegir una opción llama a `alElegir` con su id. En la
+ * versión 1 hay una sola, con las series de la submarca.
+ */
+export function listasSerie(arbol, id, alElegir) {
+  const ruta = arbol.ruta(id);
+  return ruta.slice(1).flatMap((nodo, i) => {
+    const hijos = arbol.hijos(nodo.id);
+    if (!hijos.length) return [];
+    const select = el(
+      "select",
+      { id: `lista-serie-${i + 1}` },
+      el("option", { value: nodo.id }, TODO[nodo.nivel] ?? `Todo ${nombreSerie(nodo.etiqueta)}`),
+      hijos.map((hijo) => el("option", { value: hijo.id }, nombreSerie(hijo.etiqueta))),
+    );
+    select.value = ruta[i + 2]?.id ?? nodo.id;
+    select.addEventListener("change", () => alElegir(select.value));
+    const nivel = hijos.find((hijo) => hijo.nivel !== "otras")?.nivel;
+    const titulo = arbol.version === 1 ? `Serie de ${nodo.nombre}` : (LISTA[nivel] ?? "Grupo");
+    return [el("div", { clase: "selector" }, el("label", { for: select.id }, titulo), select)];
+  });
 }
 
 /** Las tarjetas del resumen con las cifras de la serie elegida en el trimestre pronosticado. */
@@ -274,9 +304,35 @@ function filaMeses(fila, nombre, atributos = {}) {
   );
 }
 
+/** El título de la fila que separa el desglose: "Desglose por submarca", "Desglose de Submarca A por departamento". */
+function tituloDesglose(nodo, partes, version) {
+  if (nodo.nivel === "total") return "Desglose por submarca";
+  const nivel = partes.find((parte) => parte.serie.nivel !== "otras")?.serie.nivel;
+  const por = version === 1 ? "serie" : nombreNivel(nivel);
+  return `Desglose de ${nombreSerie(nodo.nombre)}${nivel ? ` por ${por}` : ""}`;
+}
+
+/** El nombre de una fila del desglose: un botón que elige ese nodo, o solo el texto si no está en el archivo. */
+function nombreParte(parte, padre, alElegir) {
+  const { serie } = parte;
+  if (serie.id === null) {
+    // "Otras series" de la versión 1, calculada aquí
+    const aclaracion = "La submarca menos las series de la lista: results.json solo trae las series de más venta.";
+    return el("span", { title: aclaracion }, nombreSerie(serie.nombre));
+  }
+  const aclaracion =
+    serie.nivel === "otras"
+      ? `Junta lo de ${nombreSerie(padre.nombre)} que no se publica por separado.`
+      : null;
+  const boton = el("button", { type: "button", clase: "boton-serie", title: aclaracion }, nombreSerie(serie.etiqueta));
+  boton.addEventListener("click", () => alElegir(serie.id));
+  return boton;
+}
+
 /**
  * La vista por mes de la serie elegida (`fila`) y, debajo, su desglose (`partes`). Elegir una fila del desglose llama
- * a `alElegir` con su nombre; la fila de "Otras series" no se puede elegir, porque no está en el archivo.
+ * a `alElegir` con su id; la fila de "Otras series" de la versión 1 no se puede elegir, porque no está en el archivo.
+ * En la versión 2, un nodo que podría desglosarse y no trae hijos lo dice en una línea.
  */
 export function tablaPorMes(fila, partes, resultados, alElegir) {
   const { ventanas, semanas } = resultados;
@@ -295,19 +351,18 @@ export function tablaPorMes(fila, partes, resultados, alElegir) {
     el("th", { scope: "col", clase: "separador" }, trimestre),
     el("th", { scope: "col" }, encabezado("Contra año anterior", "variación del trimestre, %")),
   );
-  // dentro del desglose de una submarca, sus series se nombran sin repetirla
-  const nombreCorto = (nombre) => nombreDentroDe(nombre, fila.serie.nombre);
+  // dentro del desglose de un nodo, sus partes van con su etiqueta, sin repetir el nombre del nodo
   const desglosadas = partes.map((parte) => {
-    if (parte.serie.nivel === "otras") {
-      const aclaracion = "La submarca menos las series de la lista: results.json solo trae las series de más venta.";
-      const nombre = el("span", { title: aclaracion }, nombreSerie(parte.serie.nombre));
-      return filaMeses(parte, nombre, { clase: "fila-otras" });
-    }
-    const boton = el("button", { type: "button", clase: "boton-serie" }, nombreCorto(parte.serie.nombre));
-    boton.addEventListener("click", () => alElegir(parte.serie.nombre));
-    return filaMeses(parte, boton);
+    const atributos = { clase: parte.serie.nivel === "otras" ? "fila-otras" : null };
+    return filaMeses(parte, nombreParte(parte, fila.serie, alElegir), atributos);
   });
-  const tituloDesglose = fila.serie.nivel === "total" ? "Desglose por submarca" : `Desglose de ${fila.serie.nombre} por serie`;
+  const { nivel } = fila.serie;
+  const version = resultados.version_esquema;
+  const sinDesglose = version !== 1 && partes.length === 0 && nivel !== "serie";
+  const motivo =
+    nivel === "otras"
+      ? "«Otras» no se desglosa: junta grupos que no se publican por separado."
+      : "No se desglosa: sus partes no se publican por separado en este pronóstico.";
   return el(
     "table",
     {},
@@ -316,8 +371,14 @@ export function tablaPorMes(fila, partes, resultados, alElegir) {
       "tbody",
       {},
       filaMeses(fila, nombreSerie(fila.serie.nombre), { "aria-current": "true" }),
-      desglosadas.length > 0 && el("tr", { clase: "grupo" }, el("th", { scope: "colgroup", colspan: columnas }, tituloDesglose)),
+      desglosadas.length > 0 &&
+        el(
+          "tr",
+          { clase: "grupo" },
+          el("th", { scope: "colgroup", colspan: columnas }, tituloDesglose(fila.serie, partes, version)),
+        ),
       desglosadas,
+      sinDesglose && el("tr", { clase: "sin-desglose" }, el("td", { colspan: columnas }, motivo)),
     ),
   );
 }

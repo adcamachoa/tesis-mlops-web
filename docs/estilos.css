@@ -150,7 +150,7 @@ h1 {
   }
 
   .tarjeta {
-    scroll-margin-top: 110px; /* que la barra (hasta dos líneas) no tape el título al saltar a una sección */
+    scroll-margin-top: 150px; /* que la barra (hasta tres líneas) no tape el título al saltar a una sección */
   }
 }
 
@@ -214,6 +214,11 @@ h1 {
   border-color: var(--linea-pronostico);
   background: var(--resaltado);
   font-weight: 600;
+}
+
+/* una lista por nivel de la ruta elegida, en la misma fila que los botones mientras quepan */
+.listas-serie {
+  display: contents;
 }
 
 /* Selector de tema: tres opciones pegadas */
@@ -448,6 +453,19 @@ code {
   border-top: 1px solid var(--cuadricula);
 }
 
+/* Modelos: la comparación oficial y, debajo, la tabla medida en la serie elegida */
+
+.subtitulo-modelos {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.modelos-nodo {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--cuadricula);
+}
+
 /* las cifras de la serie elegida van más grandes que los datos de la corrida */
 .resumen-serie dd {
   font-size: 1.6rem;
@@ -582,6 +600,15 @@ tr[aria-current="true"] th {
 .fila-otras th {
   font-style: italic;
   font-weight: 400;
+}
+
+/* un nodo que podría desglosarse y no se desglosa en este pronóstico */
+tr.sin-desglose td {
+  padding-top: 14px;
+  color: var(--texto-2);
+  font-style: italic;
+  text-align: left;
+  white-space: normal;
 }
 
 caption {
