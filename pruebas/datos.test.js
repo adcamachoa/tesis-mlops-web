@@ -7,14 +7,16 @@ import { describe, test } from "node:test";
 import {
   ErrorDatos,
   anioAnterior,
+  desglose,
   elegirPronostico,
+  filaPorMes,
   porNivel,
   revisarManifest,
   revisarResultados,
   semanaPromedio,
+  submarcaDe,
   sumarDias,
   urlPronostico,
-  vistaPorMes,
 } from "../docs/js/datos.js";
 
 const EJEMPLO = new URL("../docs/datos/ejemplo/", import.meta.url);
@@ -165,12 +167,11 @@ describe("cálculos", () => {
 
   test("cada mes se lleva a semana promedio: el periodo entre sus días, por 7", () => {
     assert.equal(semanaPromedio(310, 31), 70);
-    const [fila] = vistaPorMes(CHICO);
-    assert.deepEqual(fila.meses, [99, 70]);
+    assert.deepEqual(filaPorMes(CHICO, CHICO.series[0]).meses, [99, 70]);
   });
 
   test("el trimestre se compara con las mismas semanas del año anterior", () => {
-    const [fila] = vistaPorMes(CHICO);
+    const fila = filaPorMes(CHICO, CHICO.series[0]);
     assert.equal(fila.trimestre, 85.5);
     assert.equal(fila.anioAnterior, 90);
     assert.equal(fila.variacion, 85.5 / 90 - 1);
@@ -181,15 +182,75 @@ describe("cálculos", () => {
       r.semanas.real = ["2025-10-27"];
       r.series[0].real = [80];
     });
-    const [fila] = vistaPorMes(corto);
+    const fila = filaPorMes(corto, corto.series[0]);
     assert.equal(fila.anioAnterior, null);
     assert.equal(fila.variacion, null);
   });
 
   test("en el ejemplo, el trimestre por semana cuadra con la suma de los tres meses", () => {
-    for (const fila of vistaPorMes(RECIENTE)) {
-      const porMeses = (fila.serie.ventanas.reduce((a, b) => a + b, 0) * 7) / 91;
-      assert.ok(Math.abs(fila.trimestre - porMeses) < 0.1, `${fila.serie.nombre}: ${fila.trimestre} contra ${porMeses}`);
+    for (const serie of RECIENTE.series) {
+      const fila = filaPorMes(RECIENTE, serie);
+      const porMeses = (serie.ventanas.reduce((a, b) => a + b, 0) * 7) / 91;
+      assert.ok(Math.abs(fila.trimestre - porMeses) < 0.1, `${serie.nombre}: ${fila.trimestre} contra ${porMeses}`);
     }
+  });
+});
+
+describe("desglose", () => {
+  const CAMPOS = ["real", "pronostico", "ventanas"];
+  const grupos = porNivel(RECIENTE.series);
+
+  /** Que las `partes` sumen `serie` valor por valor, con la tolerancia del redondeo a 1 decimal de cada una. */
+  function sumanLaSerie(serie, partes) {
+    const tolerancia = 0.05 * (partes.length + 1) + 1e-9;
+    for (const campo of CAMPOS) {
+      serie[campo].forEach((valor, i) => {
+        const suma = partes.reduce((total, parte) => total + parte[campo][i], 0);
+        assert.ok(Math.abs(valor - suma) <= tolerancia, `${serie.nombre} ${campo}[${i}]: ${valor} contra ${suma}`);
+      });
+    }
+  }
+
+  test("la submarca se lee del nombre de la serie", () => {
+    assert.equal(submarcaDe("Submarca B | Departamento 3 | Categoría 3.2 | Tipo 26"), "Submarca B");
+    assert.equal(submarcaDe("Total"), null);
+  });
+
+  test("el total se desglosa en sus submarcas, que lo suman", () => {
+    const partes = desglose(RECIENTE, grupos.total[0]);
+    assert.deepEqual(partes.map((s) => s.nombre), ["Submarca A", "Submarca B", "Submarca C"]);
+    sumanLaSerie(grupos.total[0], partes);
+  });
+
+  test("cada submarca se desglosa en sus series más «Otras series», que la suman", () => {
+    for (const submarca of grupos.submarca) {
+      const partes = desglose(RECIENTE, submarca);
+      const [otras, ...resto] = partes.toReversed();
+      assert.equal(otras.nivel, "otras");
+      assert.equal(otras.nombre, `Otras series de ${submarca.nombre}`);
+      assert.ok(resto.length > 0 && resto.every((s) => s.nombre.startsWith(`${submarca.nombre} | `)));
+      assert.ok(CAMPOS.every((campo) => otras[campo].every((valor) => valor >= 0)));
+      sumanLaSerie(submarca, partes);
+    }
+  });
+
+  test("una serie no se desglosa", () => {
+    assert.deepEqual(desglose(RECIENTE, grupos.serie[0]), []);
+  });
+
+  test("si los nombres no dicen la submarca, no hay desglose ni error", () => {
+    const sinSubmarca = cambiado(RECIENTE, (r) => {
+      for (const [i, serie] of r.series.entries()) if (serie.nivel === "serie") serie.nombre = `Serie ${i}`;
+    });
+    for (const submarca of porNivel(sinSubmarca.series).submarca) {
+      assert.deepEqual(desglose(sinSubmarca, submarca), []);
+    }
+  });
+
+  test("si las series cubren toda la submarca, no aparece «Otras series»", () => {
+    const serie = { nivel: "serie", nombre: "Submarca A | Tipo 1", real: [3, 4], pronostico: [5], ventanas: [6] };
+    const completa = { nivel: "submarca", nombre: "Submarca A", real: [3, 4], pronostico: [5], ventanas: [6] };
+    const resultados = { series: [{ nivel: "total", nombre: "Total" }, completa, serie] };
+    assert.deepEqual(desglose(resultados, completa), [serie]);
   });
 });

@@ -218,22 +218,58 @@ const suma = (valores) => valores.reduce((total, valor) => total + valor, 0);
 export const semanaPromedio = (valor, dias) => (valor * 7) / dias;
 
 /**
- * Una fila por serie con la semana promedio de cada mes y del trimestre. El año anterior se compara solo en el
- * trimestre: la venta real viene por semana y hay semanas partidas entre dos meses, así que por mes sería una
- * aproximación. Si falta alguna de las semanas del año anterior, la comparación queda vacía.
+ * La fila de la vista por mes de una serie: semana promedio de cada mes y del trimestre. El año anterior se compara
+ * solo en el trimestre: la venta real viene por semana y hay semanas partidas entre dos meses, así que por mes sería
+ * una aproximación. Si falta alguna de las semanas del año anterior, la comparación queda vacía.
  */
-export function vistaPorMes(resultados) {
-  return resultados.series.map((serie) => {
-    const semanas = serie.pronostico.length;
-    const trimestre = suma(serie.pronostico) / semanas;
-    const previo = anioAnterior(resultados, serie);
-    const base = previo.every((valor) => valor !== null) ? suma(previo) / semanas : null;
-    return {
-      serie,
-      meses: serie.ventanas.map((valor, i) => semanaPromedio(valor, resultados.ventanas[i].dias)),
-      trimestre,
-      anioAnterior: base,
-      variacion: base ? trimestre / base - 1 : null,
-    };
-  });
+export function filaPorMes(resultados, serie) {
+  const semanas = serie.pronostico.length;
+  const trimestre = suma(serie.pronostico) / semanas;
+  const previo = anioAnterior(resultados, serie);
+  const base = previo.every((valor) => valor !== null) ? suma(previo) / semanas : null;
+  return {
+    serie,
+    meses: serie.ventanas.map((valor, i) => semanaPromedio(valor, resultados.ventanas[i].dias)),
+    trimestre,
+    anioAnterior: base,
+    variacion: base ? trimestre / base - 1 : null,
+  };
+}
+
+/**
+ * La submarca de una serie, leída de su nombre ("Submarca A | Departamento 1 | …"). results.json todavía no la trae
+ * como campo; si el nombre no tiene esa forma, null.
+ */
+export function submarcaDe(nombre) {
+  const partes = nombre.split(" | ");
+  return partes.length > 1 ? partes[0] : null;
+}
+
+const redondear = (valor) => Math.round(valor * 10) / 10; // el índice viene con 1 decimal
+
+/** Lo que le falta a `padre` para sumar `partes`, valor por valor; nunca negativo (el redondeo puede pasarse). */
+function resto(padre, partes, campo) {
+  return padre[campo].map((valor, i) => Math.max(0, redondear(valor - suma(partes.map((p) => p[campo][i])))));
+}
+
+/**
+ * Las series en que se desglosa `serie`. El total, en sus submarcas. Una submarca, en las series principales que trae
+ * results.json más "Otras series", que es la submarca menos esas series: el archivo solo trae las de más venta. Una
+ * serie no se desglosa, y tampoco una submarca sin series reconocibles por el nombre.
+ */
+export function desglose(resultados, serie) {
+  const grupos = porNivel(resultados.series);
+  if (serie.nivel === "total") return grupos.submarca;
+  if (serie.nivel !== "submarca") return [];
+  const propias = grupos.serie.filter((s) => submarcaDe(s.nombre) === serie.nombre);
+  if (!propias.length) return [];
+  const otras = {
+    nivel: "otras",
+    nombre: `Otras series de ${serie.nombre}`,
+    real: resto(serie, propias, "real"),
+    pronostico: resto(serie, propias, "pronostico"),
+    ventanas: resto(serie, propias, "ventanas"),
+  };
+  const vacia = ["real", "pronostico", "ventanas"].every((campo) => otras[campo].every((valor) => valor === 0));
+  return vacia ? propias : [...propias, otras];
 }

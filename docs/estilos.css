@@ -83,11 +83,6 @@ a {
 }
 
 .encabezado-interior {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px 32px;
-  align-items: flex-end;
-  justify-content: space-between;
   padding-top: 24px;
   padding-bottom: 20px;
 }
@@ -109,12 +104,44 @@ h1 {
   color: var(--texto-2);
 }
 
-.selector-pronostico,
-.controles {
+/* Barra de selectores: fija arriba en escritorio */
+
+.barra {
+  border-bottom: 1px solid var(--borde);
+  background: var(--superficie);
+}
+
+.barra-interior {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  align-items: center;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+@media (min-width: 601px) {
+  .barra {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .tarjeta {
+    scroll-margin-top: 72px; /* que la barra no tape el título al saltar a una sección */
+  }
+}
+
+.selector {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 8px;
   align-items: center;
+  min-width: 0;
+}
+
+.selector select {
+  max-width: min(100%, 36rem);
 }
 
 label {
@@ -216,6 +243,32 @@ select {
 h2 {
   margin: 0 0 12px;
   font-size: 1.25rem;
+}
+
+.serie-titulo {
+  overflow-wrap: anywhere;
+}
+
+.subtitulo {
+  margin: -4px 0 12px;
+  font-size: 0.95rem;
+}
+
+.nota-abajo {
+  margin: 16px 0 0;
+}
+
+.etiqueta-titulo {
+  font-size: 0.75rem;
+  vertical-align: 3px;
+}
+
+.nota-fija {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--eje);
+  background: var(--fondo);
+  font-size: 0.9rem;
 }
 
 .nota {
@@ -348,6 +401,12 @@ tr.grupo th {
   letter-spacing: 0.04em;
 }
 
+/* los nombres largos se parten solo si no caben, para que se vean los números sin desplazar */
+.nombre-serie {
+  min-width: 12rem;
+  white-space: normal;
+}
+
 .boton-serie {
   padding: 0;
   border: none;
@@ -366,9 +425,22 @@ tr[aria-current="true"] > * {
   background: var(--resaltado);
 }
 
-tr[aria-current="true"] .boton-serie {
+tr[aria-current="true"] th {
   color: var(--texto);
   font-weight: 600;
+}
+
+.fila-otras > * {
+  color: var(--texto-2);
+}
+
+.fila-otras th {
+  font-style: italic;
+  font-weight: 400;
+}
+
+caption {
+  text-align: left;
 }
 
 details {
@@ -387,7 +459,7 @@ details[open] summary {
 /* Gráfica */
 
 .cifras {
-  margin: 12px 0 8px;
+  margin: 0 0 8px;
   color: var(--texto-2);
 }
 
@@ -468,9 +540,7 @@ details[open] summary {
     height: 280px;
   }
 
-  /* los nombres largos se parten para que se vean los números sin desplazar tanto */
   .nombre-serie {
     min-width: 10rem;
-    white-space: normal;
   }
 }

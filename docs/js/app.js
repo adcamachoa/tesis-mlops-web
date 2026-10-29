@@ -1,9 +1,18 @@
-// Arranque de la página: lee manifest.json, arma el selector de pronósticos y muestra el elegido. La dirección de la
-// página guarda el pronóstico (…/#2026-10-12), así que un enlace abre ese mismo pronóstico.
+// Arranque de la página: lee manifest.json, arma los selectores y muestra el pronóstico elegido. La dirección de la
+// página guarda el pronóstico (…/#2026-10-12), así que un enlace abre ese mismo pronóstico. La serie elegida manda en
+// toda la página, salvo en la tabla de modelos, que results.json solo trae para el backtest completo.
 
 import { DATOS } from "../config.js";
-import { ErrorDatos, elegirPronostico, revisarManifest, revisarResultados, urlPronostico, vistaPorMes } from "./datos.js";
-import { fecha } from "./formato.js";
+import {
+  ErrorDatos,
+  desglose,
+  elegirPronostico,
+  filaPorMes,
+  revisarManifest,
+  revisarResultados,
+  urlPronostico,
+} from "./datos.js";
+import { fecha, nombreSerie } from "./formato.js";
 import { crearGrafica } from "./grafica.js";
 import {
   cifrasSerie,
@@ -23,7 +32,7 @@ const SIN_MOVIMIENTO = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 let entradas = [];
 let pedido = 0; // si se cambia de pronóstico antes de que llegue el anterior, la respuesta vieja se descarta
-let actual = null; // { resultados, filas, serie }
+let actual = null; // { resultados, serie }
 let grafica = null;
 
 async function leerJson(url, que) {
@@ -41,12 +50,19 @@ async function leerJson(url, que) {
   }
 }
 
+/** La barra de selectores se oculta si no hay nada que elegir. */
+function actualizarBarra() {
+  $("barra").hidden = $("selector-pronostico").hidden && $("selector-serie").hidden;
+}
+
 function mostrarEstado(hijos, esError = false) {
   const estado = $("estado");
   estado.classList.toggle("error", esError);
   estado.replaceChildren(...hijos);
   estado.hidden = false;
   $("contenido").hidden = true;
+  $("selector-serie").hidden = true; // sin pronóstico en pantalla no hay series que elegir
+  actualizarBarra();
 }
 
 function mostrarError(error) {
@@ -70,6 +86,7 @@ function llenarSelectorPronosticos() {
     ),
   );
   $("selector-pronostico").hidden = entradas.length < 2;
+  actualizarBarra();
   select.addEventListener("change", () => {
     window.location.hash = select.value;
   });
@@ -94,8 +111,9 @@ async function abrir(id) {
 }
 
 function mostrar(resultados) {
+  // al cambiar de pronóstico se conserva la serie elegida, si también está en el nuevo
   const serie = resultados.series.find((s) => s.nombre === actual?.serie) ?? resultados.series.find((s) => s.nivel === "total");
-  actual = { resultados, filas: vistaPorMes(resultados), serie: serie.nombre };
+  actual = { resultados, serie: serie.nombre };
   $("resumen").replaceChildren(resumen(resultados));
   $("modelos").replaceChildren(...tablaModelos(resultados.metricas));
   opcionesSeries($("serie"), resultados.series);
@@ -103,20 +121,27 @@ function mostrar(resultados) {
   $("pie-generado").textContent = `Datos generados el ${fecha(resultados.generado)}.`;
   $("estado").hidden = true;
   $("contenido").hidden = false;
+  $("selector-serie").hidden = false;
+  actualizarBarra();
   elegirSerie(actual.serie);
 }
 
 function elegirSerie(nombre, desdeLaTabla = false) {
-  const { resultados, filas } = actual;
-  const fila = filas.find((f) => f.serie.nombre === nombre);
+  const { resultados } = actual;
+  const serie = resultados.series.find((s) => s.nombre === nombre);
+  const fila = filaPorMes(resultados, serie);
   actual.serie = nombre;
   $("serie").value = nombre;
+  $("serie-grafica").textContent = nombreSerie(nombre);
+  $("serie-meses").textContent = nombreSerie(nombre);
   $("cifras-serie").replaceChildren(...cifrasSerie(fila));
-  grafica.mostrar(resultados, fila.serie, $("ver-anio-anterior").checked);
-  $("datos-grafica").replaceChildren(tablaDatosGrafica(resultados, fila.serie));
-  $("meses").replaceChildren(tablaPorMes(filas, resultados.ventanas, nombre, (otra) => elegirSerie(otra, true)));
+  grafica.mostrar(resultados, serie, $("ver-anio-anterior").checked);
+  $("datos-grafica").replaceChildren(tablaDatosGrafica(resultados, serie));
+  const partes = desglose(resultados, serie).map((parte) => filaPorMes(resultados, parte));
+  $("meses").replaceChildren(tablaPorMes(fila, partes, resultados, (otra) => elegirSerie(otra, true)));
   if (desdeLaTabla) {
-    $("seccion-grafica").scrollIntoView({ behavior: SIN_MOVIMIENTO.matches ? "auto" : "smooth", block: "start" });
+    // la serie nueva queda en la primera fila de la vista por mes, con su propio desglose debajo
+    $("seccion-meses").scrollIntoView({ behavior: SIN_MOVIMIENTO.matches ? "auto" : "smooth", block: "start" });
   }
 }
 

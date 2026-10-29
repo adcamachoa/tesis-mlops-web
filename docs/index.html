@@ -15,17 +15,25 @@
 <body>
   <header class="encabezado">
     <div class="contenedor encabezado-interior">
-      <div>
-        <p class="antetitulo">Tesis de maestría · MLOps</p>
-        <h1>Pronóstico de demanda semanal</h1>
-        <p class="bajada">Venta semanal pronosticada a 13 semanas con el modelo champion, elegido en un backtest.</p>
-      </div>
-      <div class="selector-pronostico" id="selector-pronostico" hidden>
+      <p class="antetitulo">Tesis de maestría · MLOps</p>
+      <h1>Pronóstico de demanda semanal</h1>
+      <p class="bajada">Venta semanal pronosticada a 13 semanas con el modelo champion, elegido en un backtest.</p>
+    </div>
+  </header>
+
+  <!-- la serie elegida manda en toda la página, salvo en la tabla de modelos; en escritorio la barra queda fija -->
+  <div class="barra" id="barra" hidden>
+    <div class="contenedor barra-interior">
+      <div class="selector" id="selector-pronostico" hidden>
         <label for="pronostico">Pronóstico</label>
         <select id="pronostico"></select>
       </div>
+      <div class="selector" id="selector-serie" hidden>
+        <label for="serie">Serie</label>
+        <select id="serie"></select>
+      </div>
     </div>
-  </header>
+  </div>
 
   <p class="aviso" id="aviso-sinteticos" role="note" hidden>
     <span class="aviso-icono" aria-hidden="true">!</span>
@@ -43,21 +51,20 @@
       </section>
 
       <section class="tarjeta" aria-labelledby="t-modelos">
-        <h2 id="t-modelos">Modelos en el backtest</h2>
+        <h2 id="t-modelos">Modelos en el backtest <span class="etiqueta etiqueta-titulo">No cambia con la serie</span></h2>
+        <p class="nota-fija">
+          Son las métricas del backtest completo, a nivel tipo de producto, y no cambian con la serie elegida:
+          results.json todavía no trae métricas por serie.
+        </p>
         <p class="nota">
-          Error de cada modelo en el backtest, a nivel tipo de producto. En WAPE y MAPE, menor es mejor. El sesgo es
-          positivo si el modelo pronosticó de más. <em>Mejor</em> es el de menor WAPE tipo × mes; el <em>champion</em>
-          es el modelo que hizo este pronóstico.
+          En WAPE y MAPE, menor es mejor. El sesgo es positivo si el modelo pronosticó de más. <em>Mejor</em> es el de
+          menor WAPE tipo × mes; el <em>champion</em> es el modelo que hizo este pronóstico.
         </p>
         <div id="modelos"></div>
       </section>
 
       <section class="tarjeta" aria-labelledby="t-grafica" id="seccion-grafica">
-        <h2 id="t-grafica">Venta real y pronóstico</h2>
-        <div class="controles">
-          <label for="serie">Serie</label>
-          <select id="serie"></select>
-        </div>
+        <h2 id="t-grafica">Venta real y pronóstico · <span class="serie-titulo" id="serie-grafica"></span></h2>
         <p class="cifras" id="cifras-serie"></p>
         <ul class="leyenda">
           <li><span class="muestra muestra-real" aria-hidden="true"></span>Venta real</li>
@@ -82,15 +89,20 @@
         </details>
       </section>
 
-      <section class="tarjeta" aria-labelledby="t-meses">
-        <h2 id="t-meses">Pronóstico por mes</h2>
-        <p class="nota">
+      <section class="tarjeta" aria-labelledby="t-meses" id="seccion-meses">
+        <h2 id="t-meses">Pronóstico por mes · <span class="serie-titulo" id="serie-meses"></span></h2>
+        <p class="subtitulo" id="unidad-meses">
+          Semana promedio de cada periodo, en índice (100 = semana promedio del total en las 52 semanas reales). La
+          columna contra el año anterior es la variación del trimestre, en %.
+        </p>
+        <div class="desplazable" id="meses" aria-describedby="unidad-meses"></div>
+        <p class="nota nota-abajo">
           Cada mes es un periodo de 31, 30 y 30 días desde el lunes siguiente al corte, no un mes del calendario. Se
           muestra como semana promedio (el pronóstico del periodo entre sus días, por 7) para comparar periodos de
           distinto largo en la misma escala de la gráfica. El año anterior se compara solo en el trimestre: la venta real
-          viene por semana y dos semanas quedan partidas entre dos meses. Elige una fila para verla en la gráfica.
+          viene por semana y dos semanas quedan partidas entre dos meses. Elige una fila del desglose para ver esa serie
+          en toda la página.
         </p>
-        <div class="desplazable" id="meses"></div>
       </section>
     </div>
   </main>

@@ -61,14 +61,24 @@ Se proponen aquí y se deciden en `tesis-mlops`; la página no inventa campos.
 - **Venta real del año anterior por ventana, exacta desde la venta diaria.** Hoy la vista por mes compara con el año anterior solo el trimestre. La venta real llega por semana y las semanas 5 y 9 se parten entre dos meses, así que por mes sería una aproximación. Con este campo la comparación sería exacta mes a mes.
   - Por ejemplo, `series[].ventanas_anio_anterior`: tres números en índice, con el mismo factor que el resto de la serie.
   - Las mismas ventanas de 31, 30 y 30 días, corridas 364 días hacia atrás (52 semanas, para que cada día caiga en el mismo día de la semana). También podría agregarse `desde` y `hasta` de cada una en `ventanas`.
-  - Mientras la página no se actualice, un `results.json` versión 2 mostraría el mensaje de formato no soportado. Conviene actualizar la página antes o junto con el cambio en `tesis-mlops`.
+- **Métricas por nivel: total, submarca y serie.** Hoy `metricas` es solo del backtest completo a nivel tipo de producto, así que la tabla de modelos no cambia con la serie elegida y lo dice.
+  - Por ejemplo, `series[].metricas`: el formato estándar de cada modelo para esa serie, con la misma forma que `metricas`.
+  - Con eso, la tabla seguiría al selector. La página explicaría además que el WAPE baja al subir de nivel: al sumar series, los errores de signo contrario se compensan, así que el total tiene menos error que una submarca, y una submarca menos que sus series.
+- **La submarca de cada serie como campo.** Hoy la página la lee del nombre (`Submarca A | Departamento 1 | …`) para desglosar cada submarca en sus series. Si un nombre no tiene esa forma, la submarca simplemente no se desglosa.
+  - Por ejemplo, `series[].submarca`: el nombre de la submarca en las series de nivel `serie`, y null en el total y las submarcas.
+  - Así la página no depende del formato del nombre.
 
 ## La página
 
+Hay dos selectores en una barra bajo el encabezado, fija arriba en escritorio: el **pronóstico** y la **serie**. La serie elegida manda en toda la página, salvo en la tabla de modelos.
+
 1. **Resumen:** modelo champion y versión, fecha del pronóstico, datos hasta, periodo pronosticado y backtest.
-2. **Modelos en el backtest:** el formato estándar (WAPE y MAPE de mes 1, mes 2 y total, más el sesgo total), con el champion y el mejor marcados. El complemento (WAPE tipo × mes, MAE y RMSE) va en un desplegable.
-3. **Venta real y pronóstico:** selector de serie (total, submarcas y series principales), 52 semanas reales, 13 de pronóstico y las mismas semanas del año anterior. Abajo hay una tabla con los datos de la gráfica.
-4. **Pronóstico por mes:** cada mes como semana promedio (el pronóstico del periodo entre sus días, por 7) y el trimestre contra el año anterior.
+2. **Modelos en el backtest:** el formato estándar (WAPE y MAPE de mes 1, mes 2 y total, más el sesgo total), con el champion y el mejor marcados. El complemento (WAPE tipo × mes, MAE y RMSE) va en un desplegable. Son las métricas del backtest completo a nivel tipo de producto y no cambian con la serie.
+3. **Venta real y pronóstico** de la serie elegida: 52 semanas reales, 13 de pronóstico y las mismas semanas del año anterior. Abajo hay una tabla con los datos de la gráfica, en índice.
+4. **Pronóstico por mes** de la serie elegida: cada mes como semana promedio en índice (el pronóstico del periodo entre sus días, por 7) y el trimestre contra el año anterior, en %. Debajo va el desglose, y al elegir una fila toda la página pasa a esa serie.
+   - **Total:** se desglosa en sus submarcas, que lo suman.
+   - **Submarca:** se desglosa en sus series principales más "Otras series", que es la submarca menos esas series, porque `results.json` solo trae las 20 de más venta.
+   - **Serie:** no se desglosa.
 
 Mientras use el ejemplo, la página muestra un aviso de datos sintéticos.
 
