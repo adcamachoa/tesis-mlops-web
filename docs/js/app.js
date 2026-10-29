@@ -1,6 +1,7 @@
-// Arranque de la página: lee manifest.json, arma los selectores y muestra el pronóstico elegido. La dirección de la
-// página guarda el pronóstico (…/#2026-10-12), así que un enlace abre ese mismo pronóstico. La serie elegida manda en
-// toda la página, salvo en la tabla de modelos, que results.json solo trae para el backtest completo.
+// Arranque de la página: lee manifest.json, arma la barra (segmentador de serie, pronóstico y tema) y muestra el
+// pronóstico elegido. La dirección de la página guarda el pronóstico (…/#2026-10-12), así que un enlace abre ese mismo
+// pronóstico. La serie elegida filtra toda la página, salvo la tabla de modelos, que results.json solo trae para el
+// backtest completo.
 
 import { DATOS } from "../config.js";
 import {
@@ -8,19 +9,22 @@ import {
   desglose,
   elegirPronostico,
   filaPorMes,
+  jerarquia,
   revisarManifest,
   revisarResultados,
+  ubicar,
   urlPronostico,
 } from "./datos.js";
 import { fecha, nombreSerie } from "./formato.js";
 import { crearGrafica } from "./grafica.js";
 import {
-  cifrasSerie,
+  botonesSerie,
   el,
   etiquetaPronostico,
   mensajeError,
-  opcionesSeries,
+  opcionesDetalle,
   resumen,
+  resumenSerie,
   tablaDatosGrafica,
   tablaModelos,
   tablaPorMes,
@@ -29,10 +33,11 @@ import {
 const $ = (id) => document.getElementById(id);
 const URL_MANIFEST = new URL("manifest.json", new URL(DATOS.url, document.baseURI));
 const SIN_MOVIMIENTO = window.matchMedia("(prefers-reduced-motion: reduce)");
+const TEMAS = ["sistema", "claro", "oscuro"];
 
 let entradas = [];
 let pedido = 0; // si se cambia de pronóstico antes de que llegue el anterior, la respuesta vieja se descarta
-let actual = null; // { resultados, serie }
+let actual = null; // { resultados, arbol, serie }
 let grafica = null;
 
 async function leerJson(url, que) {
@@ -50,9 +55,34 @@ async function leerJson(url, que) {
   }
 }
 
-/** La barra de selectores se oculta si no hay nada que elegir. */
-function actualizarBarra() {
-  $("barra").hidden = $("selector-pronostico").hidden && $("selector-serie").hidden;
+// El tema se guarda solo en este navegador. tema.js ya lo aplicó antes de dibujar la página; aquí se arma el selector.
+function temaGuardado() {
+  try {
+    const tema = window.localStorage.getItem("tema");
+    return TEMAS.includes(tema) ? tema : "sistema";
+  } catch {
+    return "sistema";
+  }
+}
+
+function elegirTema(tema) {
+  if (tema === "sistema") delete document.documentElement.dataset.tema;
+  else document.documentElement.dataset.tema = tema;
+  try {
+    if (tema === "sistema") window.localStorage.removeItem("tema");
+    else window.localStorage.setItem("tema", tema);
+  } catch {
+    // sin almacenamiento el tema vale hasta cerrar la página
+  }
+  grafica.redibujar();
+}
+
+function prepararTema() {
+  const elegido = temaGuardado();
+  for (const opcion of document.querySelectorAll('input[name="tema"]')) {
+    opcion.checked = opcion.value === elegido;
+    opcion.addEventListener("change", () => opcion.checked && elegirTema(opcion.value));
+  }
 }
 
 function mostrarEstado(hijos, esError = false) {
@@ -62,7 +92,6 @@ function mostrarEstado(hijos, esError = false) {
   estado.hidden = false;
   $("contenido").hidden = true;
   $("selector-serie").hidden = true; // sin pronóstico en pantalla no hay series que elegir
-  actualizarBarra();
 }
 
 function mostrarError(error) {
@@ -86,7 +115,6 @@ function llenarSelectorPronosticos() {
     ),
   );
   $("selector-pronostico").hidden = entradas.length < 2;
-  actualizarBarra();
   select.addEventListener("change", () => {
     window.location.hash = select.value;
   });
@@ -113,17 +141,30 @@ async function abrir(id) {
 function mostrar(resultados) {
   // al cambiar de pronóstico se conserva la serie elegida, si también está en el nuevo
   const serie = resultados.series.find((s) => s.nombre === actual?.serie) ?? resultados.series.find((s) => s.nivel === "total");
-  actual = { resultados, serie: serie.nombre };
+  actual = { resultados, arbol: jerarquia(resultados.series), serie: serie.nombre };
   $("resumen").replaceChildren(resumen(resultados));
   $("modelos").replaceChildren(...tablaModelos(resultados.metricas));
-  opcionesSeries($("serie"), resultados.series);
+  $("botones-serie").replaceChildren(...botonesSerie(actual.arbol, (nombre) => elegirSerie(nombre)));
   $("pie-escala").textContent = `Escala: ${resultados.escala}.`;
   $("pie-generado").textContent = `Datos generados el ${fecha(resultados.generado)}.`;
   $("estado").hidden = true;
   $("contenido").hidden = false;
   $("selector-serie").hidden = false;
-  actualizarBarra();
   elegirSerie(actual.serie);
+}
+
+/** El segmentador marca el botón de la serie (o de su submarca) y, si tiene series, las ofrece en la lista. */
+function pintarSegmentador(nombre) {
+  const { arbol } = actual;
+  const { boton, lista, elegida } = ubicar(arbol, nombre);
+  for (const opcion of $("botones-serie").children) {
+    opcion.setAttribute("aria-pressed", String(opcion.dataset.serie === boton));
+  }
+  const esTotal = boton === arbol.total.nombre;
+  $("selector-detalle").hidden = lista.length === 0;
+  $("t-detalle").textContent = esTotal ? "Otras series" : `Serie de ${boton}`;
+  $("serie-detalle").replaceChildren(...opcionesDetalle(boton, lista, esTotal).flat());
+  $("serie-detalle").value = elegida ?? boton;
 }
 
 function elegirSerie(nombre, desdeLaTabla = false) {
@@ -131,10 +172,11 @@ function elegirSerie(nombre, desdeLaTabla = false) {
   const serie = resultados.series.find((s) => s.nombre === nombre);
   const fila = filaPorMes(resultados, serie);
   actual.serie = nombre;
-  $("serie").value = nombre;
+  pintarSegmentador(nombre);
   $("serie-grafica").textContent = nombreSerie(nombre);
   $("serie-meses").textContent = nombreSerie(nombre);
-  $("cifras-serie").replaceChildren(...cifrasSerie(fila));
+  $("t-resumen-serie").textContent = `${nombreSerie(nombre)} · ${resultados.semanas.pronostico.length} semanas pronosticadas`;
+  $("resumen-serie").replaceChildren(resumenSerie(fila, resultados));
   grafica.mostrar(resultados, serie, $("ver-anio-anterior").checked);
   $("datos-grafica").replaceChildren(tablaDatosGrafica(resultados, serie));
   const partes = desglose(resultados, serie).map((parte) => filaPorMes(resultados, parte));
@@ -148,7 +190,8 @@ function elegirSerie(nombre, desdeLaTabla = false) {
 async function iniciar() {
   $("aviso-sinteticos").hidden = !DATOS.sinteticos;
   grafica = crearGrafica($("grafica"));
-  $("serie").addEventListener("change", (evento) => elegirSerie(evento.target.value));
+  prepararTema();
+  $("serie-detalle").addEventListener("change", (evento) => elegirSerie(evento.target.value));
   $("ver-anio-anterior").addEventListener("change", () => actual && elegirSerie(actual.serie));
   try {
     entradas = revisarManifest(await leerJson(URL_MANIFEST, "la lista de pronósticos"));

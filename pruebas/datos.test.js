@@ -10,12 +10,14 @@ import {
   desglose,
   elegirPronostico,
   filaPorMes,
+  jerarquia,
   porNivel,
   revisarManifest,
   revisarResultados,
   semanaPromedio,
   submarcaDe,
   sumarDias,
+  ubicar,
   urlPronostico,
 } from "../docs/js/datos.js";
 
@@ -245,6 +247,39 @@ describe("desglose", () => {
     for (const submarca of porNivel(sinSubmarca.series).submarca) {
       assert.deepEqual(desglose(sinSubmarca, submarca), []);
     }
+  });
+
+  test("el segmentador ordena el total, cada submarca con sus series y ninguna serie suelta", () => {
+    const arbol = jerarquia(RECIENTE.series);
+    assert.equal(arbol.total.nombre, "Total");
+    assert.deepEqual(arbol.submarcas.map((s) => s.serie.nombre), ["Submarca A", "Submarca B", "Submarca C"]);
+    for (const { serie, series } of arbol.submarcas) {
+      assert.ok(series.length > 0 && series.every((s) => s.nombre.startsWith(`${serie.nombre} | `)));
+    }
+    assert.equal(arbol.submarcas.reduce((total, s) => total + s.series.length, 0), grupos.serie.length);
+    assert.deepEqual(arbol.sueltas, []);
+  });
+
+  test("el segmentador ubica el total, una submarca y una de sus series", () => {
+    const arbol = jerarquia(RECIENTE.series);
+    const [primera] = arbol.submarcas[1].series;
+    assert.deepEqual(ubicar(arbol, "Total"), { boton: "Total", lista: [], elegida: null });
+    assert.deepEqual(ubicar(arbol, "Submarca B"), { boton: "Submarca B", lista: arbol.submarcas[1].series, elegida: null });
+    assert.deepEqual(ubicar(arbol, primera.nombre), {
+      boton: "Submarca B",
+      lista: arbol.submarcas[1].series,
+      elegida: primera.nombre,
+    });
+  });
+
+  test("las series sin submarca en el nombre se eligen desde el total", () => {
+    const sinSubmarca = cambiado(RECIENTE, (r) => {
+      for (const [i, serie] of r.series.entries()) if (serie.nivel === "serie") serie.nombre = `Serie ${i}`;
+    });
+    const arbol = jerarquia(sinSubmarca.series);
+    assert.equal(arbol.sueltas.length, 20);
+    assert.ok(arbol.submarcas.every((s) => s.series.length === 0));
+    assert.deepEqual(ubicar(arbol, "Serie 4"), { boton: "Total", lista: arbol.sueltas, elegida: "Serie 4" });
   });
 
   test("si las series cubren toda la submarca, no aparece «Otras series»", () => {

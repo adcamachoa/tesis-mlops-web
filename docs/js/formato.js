@@ -32,3 +32,9 @@ export const fechaCorta = (texto) => fecha(texto).slice(0, -5);
 
 /** "Submarca A | Departamento 1 | Tipo 3" → "Submarca A › Departamento 1 › Tipo 3". */
 export const nombreSerie = (nombre) => nombre.split(" | ").join(" › ");
+
+/** El nombre de una serie sin repetir la submarca `padre` que la contiene: "Departamento 1 › Tipo 3". */
+export function nombreDentroDe(nombre, padre) {
+  const prefijo = `${padre} | `;
+  return nombreSerie(nombre.startsWith(prefijo) ? nombre.slice(prefijo.length) : nombre);
+}

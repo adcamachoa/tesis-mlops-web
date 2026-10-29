@@ -1,5 +1,6 @@
-/* Diseño neutro: grises, un solo color para el pronóstico y la tipografía del sistema. Modo claro y oscuro según el
-   sistema operativo. Los colores de la gráfica salen de estas mismas variables (js/grafica.js). */
+/* Diseño neutro: grises, un solo color para el pronóstico y la tipografía del sistema. El tema sigue al sistema
+   operativo salvo que se elija claro u oscuro (data-tema en <html>, js/tema.js); por eso los colores oscuros van dos
+   veces. Los colores de la gráfica salen de estas mismas variables (js/grafica.js). */
 
 :root {
   color-scheme: light;
@@ -24,7 +25,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
     color-scheme: dark;
     --fondo: #0d0d0d;
     --superficie: #1a1a19;
@@ -41,6 +42,24 @@
     --linea-anterior: #76756f;
     --aviso-fondo: #2e2510;
   }
+}
+
+:root[data-tema="oscuro"] {
+  color-scheme: dark;
+  --fondo: #0d0d0d;
+  --superficie: #1a1a19;
+  --texto: #f0efec;
+  --texto-2: #c3c2b7;
+  --texto-suave: #898781;
+  --borde: rgba(255, 255, 255, 0.1);
+  --cuadricula: #2c2c2a;
+  --eje: #383835;
+  --enlace: #86b6ef;
+  --resaltado: rgba(57, 135, 229, 0.18);
+  --linea-real: #a8a79f;
+  --linea-pronostico: #3987e5;
+  --linea-anterior: #76756f;
+  --aviso-fondo: #2e2510;
 }
 
 *,
@@ -128,7 +147,7 @@ h1 {
   }
 
   .tarjeta {
-    scroll-margin-top: 72px; /* que la barra no tape el título al saltar a una sección */
+    scroll-margin-top: 110px; /* que la barra (hasta dos líneas) no tape el título al saltar a una sección */
   }
 }
 
@@ -141,7 +160,96 @@ h1 {
 }
 
 .selector select {
-  max-width: min(100%, 36rem);
+  max-width: min(100%, 30rem);
+}
+
+.barra-derecha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* Segmentador de serie: botones para el total y cada submarca, y una lista con las series de la elegida */
+
+.segmentador {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.etiqueta-control {
+  color: var(--texto-2);
+  font-size: 0.875rem;
+}
+
+.botones-segmento {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.boton-segmento {
+  padding: 5px 12px;
+  border: 1px solid var(--eje);
+  border-radius: 999px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.boton-segmento:hover {
+  border-color: var(--linea-pronostico);
+}
+
+.boton-segmento[aria-pressed="true"] {
+  border-color: var(--linea-pronostico);
+  background: var(--resaltado);
+  font-weight: 600;
+}
+
+/* Selector de tema: tres opciones pegadas */
+
+.tema {
+  display: inline-flex;
+  border: 1px solid var(--eje);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tema label {
+  position: relative;
+  padding: 5px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.tema label + label {
+  border-left: 1px solid var(--eje);
+}
+
+.tema input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.tema label:has(input:checked) {
+  background: var(--resaltado);
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.tema label:has(input:focus-visible) {
+  outline: 2px solid var(--linea-pronostico);
+  outline-offset: -2px;
 }
 
 label {
@@ -309,6 +417,27 @@ code {
   font-weight: 400;
 }
 
+.subtitulo-resumen {
+  margin: 0 0 10px;
+  color: var(--texto-2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.subtitulo-resumen ~ .subtitulo-resumen {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--cuadricula);
+}
+
+/* las cifras de la serie elegida van más grandes que los datos de la corrida */
+.resumen-serie dd {
+  font-size: 1.6rem;
+  line-height: 1.2;
+}
+
 /* Tablas */
 
 .desplazable {
@@ -456,16 +585,54 @@ details[open] summary {
   margin-bottom: 8px;
 }
 
-/* Gráfica */
+/* Sección contraíble: el título abre y cierra; empieza cerrada */
 
-.cifras {
-  margin: 0 0 8px;
+.contraible {
+  margin-top: 0;
+}
+
+.contraible > summary {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--texto);
+  list-style: none;
+}
+
+.contraible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.contraible > summary::before {
+  content: "▸";
   color: var(--texto-2);
 }
 
-.cifras strong {
-  color: var(--texto);
+.contraible[open] > summary::before {
+  content: "▾";
 }
+
+.contraible > summary::after {
+  content: "Mostrar";
+  margin-left: auto;
+  color: var(--enlace);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.contraible[open] > summary::after {
+  content: "Ocultar";
+}
+
+.contraible > summary h2 {
+  margin: 0;
+}
+
+.contraible[open] > summary {
+  margin-bottom: 12px;
+}
+
+/* Gráfica */
 
 .leyenda {
   display: flex;

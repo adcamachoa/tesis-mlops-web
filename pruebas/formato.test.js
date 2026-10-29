@@ -2,7 +2,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { VACIO, fecha, fechaCorta, indice, nombreSerie, porcentaje, variacion } from "../docs/js/formato.js";
+import {
+  VACIO,
+  fecha,
+  fechaCorta,
+  indice,
+  nombreDentroDe,
+  nombreSerie,
+  porcentaje,
+  variacion,
+} from "../docs/js/formato.js";
 
 const NBSP = " "; // el espacio antes de % no se parte en dos líneas
 
@@ -32,4 +41,9 @@ test("las fechas van como 28-oct-2026, sin cero adelante", () => {
 test("los niveles del nombre de una serie se separan con ›", () => {
   assert.equal(nombreSerie("Submarca A | Departamento 1 | Tipo 3"), "Submarca A › Departamento 1 › Tipo 3");
   assert.equal(nombreSerie("Total"), "Total");
+});
+
+test("dentro de su submarca, una serie se nombra sin repetirla", () => {
+  assert.equal(nombreDentroDe("Submarca A | Departamento 1 | Tipo 3", "Submarca A"), "Departamento 1 › Tipo 3");
+  assert.equal(nombreDentroDe("Submarca A | Departamento 1 | Tipo 3", "Submarca B"), "Submarca A › Departamento 1 › Tipo 3");
 });
