@@ -8,6 +8,7 @@
   <meta name="description" content="Pronóstico de demanda semanal de la tesis de maestría en MLOps: modelo champion, comparación de modelos y pronóstico por serie y por mes.">
   <title>Pronóstico de demanda · Tesis MLOps</title>
   <link rel="icon" href="data:,">
+  <script src="js/tema.js"></script>
   <link rel="stylesheet" href="estilos.css">
   <script src="vendor/chart.umd.min.js" defer></script>
   <script type="module" src="js/app.js"></script>
@@ -21,16 +22,27 @@
     </div>
   </header>
 
-  <!-- la serie elegida manda en toda la página, salvo en la tabla de modelos; en escritorio la barra queda fija -->
-  <div class="barra" id="barra" hidden>
+  <!-- el segmentador de serie filtra toda la página, salvo la tabla de modelos; en escritorio la barra queda fija -->
+  <div class="barra">
     <div class="contenedor barra-interior">
-      <div class="selector" id="selector-pronostico" hidden>
-        <label for="pronostico">Pronóstico</label>
-        <select id="pronostico"></select>
+      <div class="segmentador" id="selector-serie" hidden>
+        <span class="etiqueta-control" id="t-serie">Serie</span>
+        <div class="botones-segmento" id="botones-serie" role="group" aria-labelledby="t-serie"></div>
+        <div class="selector" id="selector-detalle" hidden>
+          <label for="serie-detalle" id="t-detalle"></label>
+          <select id="serie-detalle"></select>
+        </div>
       </div>
-      <div class="selector" id="selector-serie" hidden>
-        <label for="serie">Serie</label>
-        <select id="serie"></select>
+      <div class="barra-derecha">
+        <div class="selector" id="selector-pronostico" hidden>
+          <label for="pronostico">Pronóstico</label>
+          <select id="pronostico"></select>
+        </div>
+        <div class="tema" role="radiogroup" aria-label="Tema">
+          <label><input type="radio" name="tema" value="sistema">Sistema</label>
+          <label><input type="radio" name="tema" value="claro">Claro</label>
+          <label><input type="radio" name="tema" value="oscuro">Oscuro</label>
+        </div>
       </div>
     </div>
   </div>
@@ -47,6 +59,9 @@
     <div class="contenido" id="contenido" hidden>
       <section class="tarjeta" aria-labelledby="t-resumen">
         <h2 id="t-resumen">Resumen</h2>
+        <h3 class="subtitulo-resumen" id="t-resumen-serie"></h3>
+        <div id="resumen-serie"></div>
+        <h3 class="subtitulo-resumen">Corrida y modelo</h3>
         <div id="resumen"></div>
       </section>
 
@@ -65,7 +80,6 @@
 
       <section class="tarjeta" aria-labelledby="t-grafica" id="seccion-grafica">
         <h2 id="t-grafica">Venta real y pronóstico · <span class="serie-titulo" id="serie-grafica"></span></h2>
-        <p class="cifras" id="cifras-serie"></p>
         <ul class="leyenda">
           <li><span class="muestra muestra-real" aria-hidden="true"></span>Venta real</li>
           <li><span class="muestra muestra-pronostico" aria-hidden="true"></span>Pronóstico</li>
@@ -89,8 +103,11 @@
         </details>
       </section>
 
-      <section class="tarjeta" aria-labelledby="t-meses" id="seccion-meses">
-        <h2 id="t-meses">Pronóstico por mes · <span class="serie-titulo" id="serie-meses"></span></h2>
+      <!-- contraída por defecto: se abre con un clic en el título -->
+      <details class="tarjeta contraible" id="seccion-meses">
+        <summary>
+          <h2 id="t-meses">Pronóstico por mes · <span class="serie-titulo" id="serie-meses"></span></h2>
+        </summary>
         <p class="subtitulo" id="unidad-meses">
           Semana promedio de cada periodo, en índice (100 = semana promedio del total en las 52 semanas reales). La
           columna contra el año anterior es la variación del trimestre, en %.
@@ -103,7 +120,7 @@
           viene por semana y dos semanas quedan partidas entre dos meses. Elige una fila del desglose para ver esa serie
           en toda la página.
         </p>
-      </section>
+      </details>
     </div>
   </main>
 

@@ -1,11 +1,10 @@
 // Arma el resumen, las tablas y los mensajes de la página. Todo el texto que viene de los datos entra como texto
 // (append de strings), nunca como HTML.
 
-import { ErrorDatos, METRICAS_ESTANDAR, anioAnterior, porNivel } from "./datos.js";
-import { fecha, fechaCorta, indice, nombreSerie, porcentaje, variacion } from "./formato.js";
+import { ErrorDatos, METRICAS_ESTANDAR, anioAnterior } from "./datos.js";
+import { fecha, fechaCorta, indice, nombreDentroDe, nombreSerie, porcentaje, variacion } from "./formato.js";
 
 const MAXIMO_DETALLES = 8;
-const GRUPOS = { total: "Total", submarca: "Submarcas", serie: "Series principales" };
 const CIEN = "100 = semana promedio del total";
 
 /** Un elemento con sus atributos (`clase` es className) y sus hijos; null y false se saltan. */
@@ -157,28 +156,37 @@ export function tablaModelos(metricas) {
   return [el("div", { clase: "desplazable" }, estandar), nota, complemento].filter(Boolean);
 }
 
-/** Llena el selector de series, agrupado por nivel. */
-export function opcionesSeries(select, series) {
-  const grupos = porNivel(series);
-  select.replaceChildren(
-    ...Object.entries(GRUPOS)
-      .filter(([nivel]) => grupos[nivel].length)
-      .map(([nivel, titulo]) =>
-        el("optgroup", { label: titulo }, grupos[nivel].map((s) => el("option", { value: s.nombre }, nombreSerie(s.nombre)))),
-      ),
-  );
+/** Los botones del segmentador: el total y cada submarca. Cada uno lleva su serie en data-serie. */
+export function botonesSerie(arbol, alElegir) {
+  return [arbol.total, ...arbol.submarcas.map((s) => s.serie)].map((serie) => {
+    const boton = el("button", { type: "button", clase: "boton-segmento", "data-serie": serie.nombre }, serie.nombre);
+    boton.addEventListener("click", () => alElegir(serie.nombre));
+    return boton;
+  });
 }
 
-/** La línea de cifras de la serie elegida, sobre la gráfica. */
-export function cifrasSerie(fila) {
-  const partes = [
-    "Semana promedio del pronóstico: ",
-    el("strong", {}, indice(fila.trimestre)),
+/** Las opciones de la lista del segmentador: el botón activo entero y, debajo, sus series sin repetir su nombre. */
+export function opcionesDetalle(boton, lista, esTotal) {
+  return [
+    el("option", { value: boton }, esTotal ? "Todo el total" : "Toda la submarca"),
+    lista.map((serie) => el("option", { value: serie.nombre }, nombreDentroDe(serie.nombre, boton))),
   ];
-  if (fila.anioAnterior !== null) {
-    partes.push(" · mismas semanas del año anterior: ", el("strong", {}, indice(fila.anioAnterior)), ` (${variacion(fila.variacion)})`);
-  }
-  return partes;
+}
+
+/** Las tarjetas del resumen con las cifras de la serie elegida en el trimestre pronosticado. */
+export function resumenSerie(fila, { semanas, ventanas }) {
+  const datos = [
+    ["Semana promedio del pronóstico", indice(fila.trimestre), `${fecha(semanas.pronostico[0])} al ${fecha(ventanas.at(-1).hasta)}`],
+    ["Mismas semanas del año anterior", indice(fila.anioAnterior), "venta real, 52 semanas antes"],
+    ["Contra el año anterior", variacion(fila.variacion), "variación del trimestre"],
+  ];
+  return el(
+    "dl",
+    { clase: "resumen resumen-serie" },
+    datos.map(([titulo, valor, detalle]) =>
+      el("div", { clase: "dato" }, el("dt", {}, titulo), el("dd", {}, valor, el("span", { clase: "detalle" }, detalle))),
+    ),
+  );
 }
 
 /** La tabla con los datos de la gráfica, semana por semana. */
@@ -242,8 +250,7 @@ export function tablaPorMes(fila, partes, resultados, alElegir) {
     el("th", { scope: "col" }, encabezado("Contra año anterior", "variación del trimestre, %")),
   );
   // dentro del desglose de una submarca, sus series se nombran sin repetirla
-  const prefijo = fila.serie.nivel === "submarca" ? `${fila.serie.nombre} | ` : null;
-  const nombreCorto = (nombre) => nombreSerie(prefijo && nombre.startsWith(prefijo) ? nombre.slice(prefijo.length) : nombre);
+  const nombreCorto = (nombre) => nombreDentroDe(nombre, fila.serie.nombre);
   const desglosadas = partes.map((parte) => {
     if (parte.serie.nivel === "otras") {
       const aclaracion = "La submarca menos las series de la lista: results.json solo trae las series de más venta.";

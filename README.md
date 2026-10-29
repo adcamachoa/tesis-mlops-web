@@ -70,12 +70,16 @@ Se proponen aquí y se deciden en `tesis-mlops`; la página no inventa campos.
 
 ## La página
 
-Hay dos selectores en una barra bajo el encabezado, fija arriba en escritorio: el **pronóstico** y la **serie**. La serie elegida manda en toda la página, salvo en la tabla de modelos.
+Una barra bajo el encabezado, fija arriba en escritorio, tiene tres controles:
 
-1. **Resumen:** modelo champion y versión, fecha del pronóstico, datos hasta, periodo pronosticado y backtest.
+- **Segmentador de serie:** botones para el total y cada submarca y, al elegir una submarca, una lista con sus series. La serie elegida filtra toda la página, salvo la tabla de modelos.
+- **Pronóstico:** el origen que se muestra, si hay más de uno.
+- **Tema:** *Sistema*, *Claro* u *Oscuro*. Por defecto sigue al sistema operativo. La elección se guarda solo en el navegador de quien la hace (`localStorage`), y `js/tema.js` la aplica antes de dibujar la página para que no parpadee.
+
+1. **Resumen:** las cifras de la serie elegida en las 13 semanas pronosticadas (semana promedio del pronóstico, la del año anterior y la variación) y los datos de la corrida: modelo champion y versión, fecha del pronóstico, datos hasta, periodo pronosticado y backtest.
 2. **Modelos en el backtest:** el formato estándar (WAPE y MAPE de mes 1, mes 2 y total, más el sesgo total), con el champion y el mejor marcados. El complemento (WAPE tipo × mes, MAE y RMSE) va en un desplegable. Son las métricas del backtest completo a nivel tipo de producto y no cambian con la serie.
 3. **Venta real y pronóstico** de la serie elegida: 52 semanas reales, 13 de pronóstico y las mismas semanas del año anterior. Abajo hay una tabla con los datos de la gráfica, en índice.
-4. **Pronóstico por mes** de la serie elegida: cada mes como semana promedio en índice (el pronóstico del periodo entre sus días, por 7) y el trimestre contra el año anterior, en %. Debajo va el desglose, y al elegir una fila toda la página pasa a esa serie.
+4. **Pronóstico por mes** de la serie elegida, contraído por defecto (se abre con un clic en el título): cada mes como semana promedio en índice (el pronóstico del periodo entre sus días, por 7) y el trimestre contra el año anterior, en %. Debajo va el desglose, y al elegir una fila toda la página pasa a esa serie.
    - **Total:** se desglosa en sus submarcas, que lo suman.
    - **Submarca:** se desglosa en sus series principales más "Otras series", que es la submarca menos esas series, porque `results.json` solo trae las 20 de más venta.
    - **Serie:** no se desglosa.
@@ -91,7 +95,8 @@ docs/                       lo que publica GitHub Pages (main, carpeta /docs)
   js/formato.js             números, porcentajes y fechas en español
   js/secciones.js           resumen, tablas y mensajes de error
   js/grafica.js             la gráfica con Chart.js
-  js/app.js                 arranque y selectores
+  js/app.js                 arranque, segmentador, selector de pronóstico y tema
+  js/tema.js                aplica el tema guardado antes de dibujar la página
   vendor/                   Chart.js 4.5.1 y su licencia
   datos/ejemplo/            manifest.json y un results.json sintético por origen
 herramientas/

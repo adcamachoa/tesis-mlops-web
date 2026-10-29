@@ -245,6 +245,36 @@ export function submarcaDe(nombre) {
   return partes.length > 1 ? partes[0] : null;
 }
 
+/**
+ * Las series ordenadas para el segmentador: el total, cada submarca con sus series y las series cuyo nombre no dice
+ * una submarca conocida (con el formato actual no hay; si aparecen, se eligen desde el total).
+ */
+export function jerarquia(series) {
+  const grupos = porNivel(series);
+  const conocidas = new Set(grupos.submarca.map((s) => s.nombre));
+  return {
+    total: grupos.total[0],
+    submarcas: grupos.submarca.map((s) => ({
+      serie: s,
+      series: grupos.serie.filter((hija) => submarcaDe(hija.nombre) === s.nombre),
+    })),
+    sueltas: grupos.serie.filter((s) => !conocidas.has(submarcaDe(s.nombre))),
+  };
+}
+
+/**
+ * Qué muestra el segmentador para la serie `nombre`: el botón activo (el total o una submarca), las series de la lista
+ * de ese botón y cuál de ellas está elegida (null si se eligió el botón mismo).
+ */
+export function ubicar(arbol, nombre) {
+  for (const { serie, series } of arbol.submarcas) {
+    if (serie.nombre === nombre || series.some((s) => s.nombre === nombre)) {
+      return { boton: serie.nombre, lista: series, elegida: serie.nombre === nombre ? null : nombre };
+    }
+  }
+  return { boton: arbol.total.nombre, lista: arbol.sueltas, elegida: arbol.total.nombre === nombre ? null : nombre };
+}
+
 const redondear = (valor) => Math.round(valor * 10) / 10; // el índice viene con 1 decimal
 
 /** Lo que le falta a `padre` para sumar `partes`, valor por valor; nunca negativo (el redondeo puede pasarse). */

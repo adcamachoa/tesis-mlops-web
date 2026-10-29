@@ -159,7 +159,10 @@ function configuracion(resultados, serie, verAnterior) {
   };
 }
 
-/** Crea la gráfica en `lienzo`. `mostrar` la vuelve a dibujar con otra serie; también se redibuja al cambiar de modo. */
+/**
+ * Crea la gráfica en `lienzo`. `mostrar` la vuelve a dibujar con otra serie, y `redibujar` con los colores del tema
+ * elegido; si el tema sigue al sistema, también se redibuja sola cuando el sistema cambia de modo.
+ */
 export function crearGrafica(lienzo) {
   let grafica = null;
   let actual = null;
@@ -177,6 +180,9 @@ export function crearGrafica(lienzo) {
     mostrar(resultados, serie, verAnterior) {
       actual = { resultados, serie, verAnterior };
       dibujar();
+    },
+    redibujar() {
+      if (actual) dibujar();
     },
   };
 }
