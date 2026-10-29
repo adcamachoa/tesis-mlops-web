@@ -14,6 +14,7 @@ Página estática y pública de los pronósticos de [tesis-mlops](https://github
 - **Métricas en el formato estándar:** WAPE y MAPE de mes 1, mes 2 y total, más el sesgo total.
 - **Workflows:** nada de `pull_request_target`, acciones fijadas por commit, permisos mínimos y los mismos criterios de seguridad que `tesis-mlops`. Hoy solo existe `ci.yml` (pruebas en cada PR); la página se publica desde `main` `/docs`, sin workflow de despliegue.
 - **Datos de ejemplo solo sintéticos.** Se generan con `herramientas/generar_ejemplo.py`, que los valida con el esquema de `tesis-mlops`; no se editan a mano. De `tesis-mlops` solo se lee: nunca se edita desde aquí.
+- **Nada de datos reales ni MLflow desde aquí.** Este repo trabaja solo con datos sintéticos y con lo que publica `tesis-mlops`. Los análisis con datos reales, con Databricks o con MLflow se hacen en `tesis-mlops`, y nada de eso se descarga en este repo ni en carpetas temporales de sus sesiones.
 - **Sin dependencias.** HTML, CSS y JavaScript sin compilar. Chart.js va en `docs/vendor/` con versión fija y su licencia; las pruebas usan `node --test`.
 - **El texto de los datos nunca entra como HTML.** Se usa `textContent` o `append` con strings, nunca `innerHTML`. La política de seguridad de `index.html` solo deja cargar scripts y datos del propio sitio.
 
