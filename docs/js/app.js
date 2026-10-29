@@ -3,7 +3,7 @@
 // pronóstico. La serie elegida filtra toda la página, salvo la tabla de modelos, que results.json solo trae para el
 // backtest completo.
 
-import { DATOS } from "../config.js";
+import { DATOS } from "../config.js?v=46aee493";
 import {
   ErrorDatos,
   desglose,
@@ -14,11 +14,11 @@ import {
   revisarResultados,
   ubicar,
   urlPronostico,
-} from "./datos.js";
-import { exportarComplemento, exportarGrafica, exportarModelos, exportarPorMes } from "./exportar.js";
-import { fecha, nombreSerie } from "./formato.js";
-import { crearGrafica } from "./grafica.js";
-import { TIPO_XLSX, libroXlsx } from "./xlsx.js";
+} from "./datos.js?v=46aee493";
+import { exportarComplemento, exportarGrafica, exportarModelos, exportarPorMes } from "./exportar.js?v=46aee493";
+import { fecha, nombreSerie } from "./formato.js?v=46aee493";
+import { crearGrafica } from "./grafica.js?v=46aee493";
+import { TIPO_XLSX, libroXlsx } from "./xlsx.js?v=46aee493";
 import {
   botonExportar,
   botonesSerie,
@@ -31,7 +31,7 @@ import {
   tablaDatosGrafica,
   tablaModelos,
   tablaPorMes,
-} from "./secciones.js";
+} from "./secciones.js?v=46aee493";
 
 const $ = (id) => document.getElementById(id);
 const URL_MANIFEST = new URL("manifest.json", new URL(DATOS.url, document.baseURI));

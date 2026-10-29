@@ -1,8 +1,8 @@
 // Arma el resumen, las tablas y los mensajes de la página. Todo el texto que viene de los datos entra como texto
 // (append de strings), nunca como HTML.
 
-import { ErrorDatos, anioAnterior } from "./datos.js";
-import { fecha, fechaCorta, indice, nombreDentroDe, nombreSerie, porcentaje, variacion } from "./formato.js";
+import { ErrorDatos, anioAnterior } from "./datos.js?v=46aee493";
+import { fecha, fechaCorta, indice, nombreDentroDe, nombreSerie, porcentaje, variacion } from "./formato.js?v=46aee493";
 
 const MAXIMO_DETALLES = 8;
 const COLUMNAS_MODELOS = ["wape_m1", "wape_m2", "wape_total", "sesgo_total"]; // sin MAPE

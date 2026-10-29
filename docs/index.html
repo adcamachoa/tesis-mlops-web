@@ -8,10 +8,10 @@
   <meta name="description" content="Pronóstico de demanda semanal de la tesis de maestría en MLOps: modelo champion, comparación de modelos y pronóstico por serie y por mes.">
   <title>Pronóstico de demanda · Tesis MLOps</title>
   <link rel="icon" href="data:,">
-  <script src="js/tema.js"></script>
-  <link rel="stylesheet" href="estilos.css">
-  <script src="vendor/chart.umd.min.js" defer></script>
-  <script type="module" src="js/app.js"></script>
+  <script src="js/tema.js?v=46aee493"></script>
+  <link rel="stylesheet" href="estilos.css?v=46aee493">
+  <script src="vendor/chart.umd.min.js?v=46aee493" defer></script>
+  <script type="module" src="js/app.js?v=46aee493"></script>
 </head>
 <body>
   <header class="encabezado">
@@ -79,7 +79,7 @@
       </section>
 
       <section class="tarjeta" aria-labelledby="t-grafica" id="seccion-grafica">
-        <h2 id="t-grafica">Venta real y pronóstico · <span class="serie-titulo" id="serie-grafica"></span></h2>
+        <h2 id="t-grafica">Venta real y pronóstico<span class="serie-titulo" id="serie-grafica"></span></h2>
         <ul class="leyenda">
           <li><span class="muestra muestra-real" aria-hidden="true"></span>Venta real</li>
           <li><span class="muestra muestra-pronostico" aria-hidden="true"></span>Pronóstico</li>
@@ -107,11 +107,12 @@
       <!-- contraída por defecto: se abre con un clic en el título -->
       <details class="tarjeta contraible" id="seccion-meses">
         <summary>
-          <h2 id="t-meses">Pronóstico por mes · <span class="serie-titulo" id="serie-meses"></span></h2>
+          <h2 id="t-meses">Pronóstico por mes<span class="serie-titulo" id="serie-meses"></span></h2>
         </summary>
         <p class="subtitulo" id="unidad-meses">
-          Semana promedio de cada periodo, en índice (100 = semana promedio del total en las 52 semanas reales). La
-          columna contra el año anterior es la variación del trimestre, en %.
+          Es el pronóstico de la serie, no una métrica de error. Cada mes se muestra como la semana promedio del periodo,
+          en índice: 100 = semana promedio del total en las 52 semanas reales. «Contra año anterior» es la variación del
+          trimestre completo, en %.
         </p>
         <div class="desplazable" id="meses" aria-describedby="unidad-meses"></div>
         <div id="exportar-meses"></div>

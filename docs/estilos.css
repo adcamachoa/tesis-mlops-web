@@ -357,6 +357,11 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+/* el "·" va solo cuando hay una serie: sin ella el título queda limpio, sin un "·" suelto */
+.serie-titulo:not(:empty)::before {
+  content: " · ";
+}
+
 .subtitulo {
   margin: -4px 0 12px;
   font-size: 0.95rem;

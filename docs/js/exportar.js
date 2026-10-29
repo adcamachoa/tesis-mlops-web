@@ -1,8 +1,8 @@
 // Arma el contenido de cada tabla de la página para exportarla a Excel: las mismas columnas que se ven, con los números
 // como números (no como texto) y una hoja "Notas" con de dónde salen. Sin DOM: se prueba con node --test.
 
-import { anioAnterior } from "./datos.js";
-import { fecha, nombreSerie } from "./formato.js";
+import { anioAnterior } from "./datos.js?v=46aee493";
+import { fecha, nombreSerie } from "./formato.js?v=46aee493";
 
 const FUENTE = "https://github.com/adcamachoa/tesis-mlops-web";
 const indice = (valor) => ({ valor, formato: "indice" });
