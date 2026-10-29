@@ -198,5 +198,5 @@ El ejemplo de la versión 1 quedó fijo en `pruebas/datos/v1/`, como lo generaba
 
 ## Estado
 
-- **Hecho:** la página publicada muestra los pronósticos que publica `tesis-mlops`; en local, el ejemplo sintético. Lee las versiones 1 y 2 de `results.json`.
-- **Siguiente:** cuando esta página esté publicada, `tesis-mlops` hace el merge de la fase 9c y empieza a publicar la versión 2.
+- **Hecho:** la página publicada muestra los pronósticos que publica `tesis-mlops`; en local, el ejemplo sintético. Desde el 29-oct-2026 el sitio muestra la versión 2 de `results.json`, el árbol de la fase 9c. La página sigue leyendo también la versión 1.
+- **Pendiente con `tesis-mlops`:** nada. La propuesta de arriba es una idea para una versión futura, no un compromiso.
