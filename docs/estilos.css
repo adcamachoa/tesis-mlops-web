@@ -585,6 +585,34 @@ details[open] summary {
   margin-bottom: 8px;
 }
 
+/* Botón para exportar una tabla a Excel, debajo de cada tabla */
+
+.exportar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.boton-exportar {
+  padding: 5px 12px;
+  border: 1px solid var(--eje);
+  border-radius: 6px;
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.boton-exportar::before {
+  content: "↓ ";
+  color: var(--texto-2);
+}
+
+.boton-exportar:hover {
+  border-color: var(--linea-pronostico);
+}
+
 /* Sección contraíble: el título abre y cierra; empieza cerrada */
 
 .contraible {

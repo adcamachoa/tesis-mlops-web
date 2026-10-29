@@ -15,9 +15,12 @@ import {
   ubicar,
   urlPronostico,
 } from "./datos.js";
+import { exportarComplemento, exportarGrafica, exportarModelos, exportarPorMes } from "./exportar.js";
 import { fecha, nombreSerie } from "./formato.js";
 import { crearGrafica } from "./grafica.js";
+import { TIPO_XLSX, libroXlsx } from "./xlsx.js";
 import {
+  botonExportar,
   botonesSerie,
   el,
   etiquetaPronostico,
@@ -85,6 +88,18 @@ function prepararTema() {
   }
 }
 
+/** Arma el .xlsx de una tabla (`{ archivo, hojas }`, de exportar.js) y lo descarga. */
+function descargar({ archivo, hojas }) {
+  const url = URL.createObjectURL(new Blob([libroXlsx(hojas)], { type: TIPO_XLSX }));
+  const enlace = el("a", { href: url, download: archivo, hidden: true });
+  document.body.append(enlace);
+  enlace.click();
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const OPCIONES_EXPORTAR = { sinteticos: DATOS.sinteticos };
+
 function mostrarEstado(hijos, esError = false) {
   const estado = $("estado");
   estado.classList.toggle("error", esError);
@@ -143,7 +158,12 @@ function mostrar(resultados) {
   const serie = resultados.series.find((s) => s.nombre === actual?.serie) ?? resultados.series.find((s) => s.nivel === "total");
   actual = { resultados, arbol: jerarquia(resultados.series), serie: serie.nombre };
   $("resumen").replaceChildren(resumen(resultados));
-  $("modelos").replaceChildren(...tablaModelos(resultados.metricas));
+  $("modelos").replaceChildren(
+    ...tablaModelos(resultados.metricas, {
+      alExportar: () => descargar(exportarModelos(resultados, OPCIONES_EXPORTAR)),
+      alExportarComplemento: () => descargar(exportarComplemento(resultados, OPCIONES_EXPORTAR)),
+    }),
+  );
   $("botones-serie").replaceChildren(...botonesSerie(actual.arbol, (nombre) => elegirSerie(nombre)));
   $("pie-escala").textContent = `Escala: ${resultados.escala}.`;
   $("pie-generado").textContent = `Datos generados el ${fecha(resultados.generado)}.`;
@@ -179,8 +199,14 @@ function elegirSerie(nombre, desdeLaTabla = false) {
   $("resumen-serie").replaceChildren(resumenSerie(fila, resultados));
   grafica.mostrar(resultados, serie, $("ver-anio-anterior").checked);
   $("datos-grafica").replaceChildren(tablaDatosGrafica(resultados, serie));
+  $("exportar-grafica").replaceChildren(
+    botonExportar(() => descargar(exportarGrafica(resultados, serie, OPCIONES_EXPORTAR))),
+  );
   const partes = desglose(resultados, serie).map((parte) => filaPorMes(resultados, parte));
   $("meses").replaceChildren(tablaPorMes(fila, partes, resultados, (otra) => elegirSerie(otra, true)));
+  $("exportar-meses").replaceChildren(
+    botonExportar(() => descargar(exportarPorMes(resultados, fila, partes, OPCIONES_EXPORTAR))),
+  );
   if (desdeLaTabla) {
     // la serie nueva queda en la primera fila de la vista por mes, con su propio desglose debajo
     $("seccion-meses").scrollIntoView({ behavior: SIN_MOVIMIENTO.matches ? "auto" : "smooth", block: "start" });
