@@ -2,8 +2,8 @@
 // Los colores salen de las variables de estilos.css, así que siguen el modo claro u oscuro. Además del color, cada línea
 // tiene su trazo: continua la venta real, a rayas el pronóstico y punteada el año anterior.
 
-import { anioAnterior } from "./datos.js";
-import { fecha, fechaCorta, indice, nombreSerie } from "./formato.js";
+import { anioAnterior } from "./datos.js?v=46aee493";
+import { fecha, fechaCorta, indice, nombreSerie } from "./formato.js?v=46aee493";
 
 const FUENTE = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const OSCURO = window.matchMedia("(prefers-color-scheme: dark)");

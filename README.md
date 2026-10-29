@@ -21,7 +21,7 @@ Un pronóstico. Su formato lo define `src/common/results_schema.py` en `tesis-ml
 
 ### `manifest.json`
 
-Lista los pronósticos disponibles. La página arma el selector a partir de él. Formato aprobado (versión 1), **falta implementarlo en `tesis-mlops`**:
+Lista los pronósticos disponibles. La página arma el selector a partir de él. Formato versión 1, implementado en `tesis-mlops`:
 
 ```json
 {
@@ -50,9 +50,16 @@ Lista los pronósticos disponibles. La página arma el selector a partir de él.
 
 ### URL pública de los datos
 
-Se define en la fase 9 de `tesis-mlops`. Sugerencia: publicar `manifest.json` y los `results.json` en el GitHub Pages de ese repo (`adcamachoa.github.io/tesis-mlops/datos/`). Esta página queda en `adcamachoa.github.io/tesis-mlops-web/`: el mismo dominio, así que el navegador deja leer los datos sin configuración extra.
+`tesis-mlops` publica `manifest.json` y los `results.json` en el GitHub Pages de ese repo: <https://adcamachoa.github.io/tesis-mlops/datos/>. Esta página queda en <https://adcamachoa.github.io/tesis-mlops-web/>: el mismo dominio, así que la política de seguridad (`connect-src 'self'`) deja leer los datos sin configuración extra.
 
-Cuando exista, se cambia en `docs/config.js` (`url` y `sinteticos: false`). Si queda en otro dominio, hay que agregarlo a `connect-src` en la política de seguridad de `docs/index.html`.
+`docs/config.js` elige los datos según el host, porque la misma carpeta `docs/` se sirve publicada y en local sin paso de compilación:
+
+- **En `adcamachoa.github.io`:** los datos publicados (`/tesis-mlops/datos/`), sin aviso.
+- **En cualquier otro host** (local, un fork): el ejemplo sintético (`datos/ejemplo/`), con su aviso.
+
+La carpeta y el aviso van siempre en pareja. Los datos no se pueden cambiar desde la dirección de la página: ni parámetros ni `#`. Si la página o los datos cambian de dominio, se cambia `docs/config.js` y, si quedan en dominios distintos, se agrega el de los datos a `connect-src` en `docs/index.html`.
+
+GitHub Pages guarda los archivos en caché hasta 10 minutos, así que un pronóstico nuevo puede tardar ese tiempo en aparecer.
 
 ### Propuestas para la versión 2 de `results.json`
 
@@ -79,7 +86,7 @@ Una barra bajo el encabezado, fija arriba en escritorio, tiene tres controles:
 1. **Resumen:** las cifras de la serie elegida en las 13 semanas pronosticadas (semana promedio del pronóstico, la del año anterior y la variación) y los datos de la corrida: modelo champion y versión, fecha del pronóstico, datos hasta, periodo pronosticado y backtest.
 2. **Modelos en el backtest:** WAPE de mes 1, mes 2 y total, más el sesgo total, con el champion y el mejor marcados. El complemento (WAPE tipo × mes, MAE y RMSE) va en un desplegable. Son las métricas del backtest completo a nivel tipo de producto y no cambian con la serie. El MAPE viene en `results.json`, pero la página no lo muestra.
 3. **Venta real y pronóstico** de la serie elegida: 52 semanas reales, 13 de pronóstico y las mismas semanas del año anterior. Abajo hay una tabla con los datos de la gráfica, en índice.
-4. **Pronóstico por mes** de la serie elegida, contraído por defecto (se abre con un clic en el título): cada mes como semana promedio en índice (el pronóstico del periodo entre sus días, por 7) y el trimestre contra el año anterior, en %. Debajo va el desglose, y al elegir una fila toda la página pasa a esa serie.
+4. **Pronóstico por mes** de la serie elegida, contraído por defecto (se abre con un clic en el título): cada mes como semana promedio en índice (el pronóstico del periodo entre sus días, por 7) y el trimestre contra el año anterior, en %. Un texto arriba de la tabla aclara que es el pronóstico, no una métrica de error. Debajo va el desglose, y al elegir una fila toda la página pasa a esa serie.
    - **Total:** se desglosa en sus submarcas, que lo suman.
    - **Submarca:** se desglosa en sus series principales más "Otras series", que es la submarca menos esas series, porque `results.json` solo trae las 20 de más venta.
    - **Serie:** no se desglosa.
@@ -90,13 +97,14 @@ Una barra bajo el encabezado, fija arriba en escritorio, tiene tres controles:
 - **Serie elegida:** las tablas de la gráfica y del pronóstico por mes salen de la serie elegida.
 - **Sin dependencias:** el archivo se arma en el navegador con `js/xlsx.js`.
 
-Mientras use el ejemplo, la página muestra un aviso de datos sintéticos, y los archivos exportados lo repiten en sus notas.
+Con el ejemplo (en local o en cualquier sitio que no sea el publicado), la página muestra un aviso de datos sintéticos, y los archivos exportados lo repiten en sus notas.
 
 ## Estructura
 
 ```
 docs/                       lo que publica GitHub Pages (main, carpeta /docs)
-  index.html  estilos.css  config.js  .nojekyll
+  index.html  estilos.css  .nojekyll
+  config.js                 de dónde lee los datos: publicados en el sitio, el ejemplo en cualquier otro host
   js/datos.js               lee y revisa manifest y results; cálculos (sin DOM, con pruebas)
   js/formato.js             números, porcentajes y fechas en español
   js/secciones.js           resumen, tablas y mensajes de error
@@ -110,6 +118,7 @@ docs/                       lo que publica GitHub Pages (main, carpeta /docs)
 herramientas/
   generar_ejemplo.py        genera docs/datos/ejemplo/ y lo valida con el esquema de tesis-mlops
   servir.js                 servidor local para ver la página (npm start)
+  version.js                pone la versión (?v=huella) en las rutas de los JS y CSS
 pruebas/                    pruebas con node --test
 .github/workflows/ci.yml    pruebas en cada PR a main
 ```
@@ -123,7 +132,7 @@ npm test      # pruebas
 npm start     # la página en http://127.0.0.1:8000
 ```
 
-`npm start` es necesario porque la página lee los JSON con `fetch`, que no funciona abriendo `index.html` como archivo.
+`npm start` es necesario porque la página lee los JSON con `fetch`, que no funciona abriendo `index.html` como archivo. En local la página muestra el ejemplo sintético con su aviso, y las pruebas también lo usan: los datos publicados solo se ven en el sitio.
 
 Para regenerar los datos sintéticos hace falta `../tesis-mlops` y Python con pandas, numpy y jsonschema:
 
@@ -135,8 +144,13 @@ El script valida cada `results.json` con `validar` de `tesis-mlops` antes de esc
 
 ## Publicación
 
-- **GitHub Pages** se configura a mano: Settings → Pages → Deploy from a branch → `main`, carpeta `/docs`. No hay workflow de despliegue.
+- **GitHub Pages** publica `main`, carpeta `/docs`, en <https://adcamachoa.github.io/tesis-mlops-web/>. Se configuró a mano (Settings → Pages → Deploy from a branch); no hay workflow de despliegue.
 - **CI** (`.github/workflows/ci.yml`) corre `node --test` en cada PR a `main`. Usa `pull_request` y nunca `pull_request_target`, tiene permisos de solo lectura, no usa secretos y fija sus acciones por commit.
+- **Ruleset en `main`:** todo cambio entra por PR con el check `pruebas` en verde; no se puede borrar la rama ni forzar el push, y nadie se lo salta.
+- **Versión de los archivos.** Cada ruta de `index.html` a un JS o CSS (Chart.js incluido) y cada `import` entre módulos lleva `?v=<huella>`, la misma en todas. Así, después de publicar, el navegador no mezcla un archivo viejo de su caché con los nuevos.
+  - **Cuándo correrlo:** después de tocar cualquier JS o CSS de `docs/`, corre `node herramientas/version.js`. Si se olvida, las pruebas fallan.
+  - **La huella:** son 8 caracteres del sha256 del contenido de todos los JS y CSS. No cuenta los `?v=` ya escritos ni los fines de línea, así que correr el script dos veces seguidas no cambia nada.
+  - **El límite:** GitHub Pages guarda el `index.html` en caché hasta 10 minutos. En ese rato alguien puede seguir viendo la versión anterior completa, sin mezclas.
 
 ## Dependencias
 
@@ -147,7 +161,5 @@ El script valida cada `results.json` con `validar` de `tesis-mlops` antes de esc
 
 ## Estado
 
-- **Hecho:** la página funciona con datos sintéticos.
-- **Falta:**
-  - en `tesis-mlops`: `manifest.json` y la URL pública (fase 9);
-  - aquí: apuntar `docs/config.js` a esa URL y activar GitHub Pages.
+- **Hecho:** la página publicada muestra los pronósticos que publica `tesis-mlops`; en local, el ejemplo sintético.
+- **Siguiente:** la versión 2 de `results.json`, que se define en `tesis-mlops` (ver las propuestas arriba).
