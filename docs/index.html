@@ -8,10 +8,10 @@
   <meta name="description" content="Pronóstico de demanda semanal de la tesis de maestría en MLOps: modelo champion, comparación de modelos y pronóstico por serie y por mes.">
   <title>Pronóstico de demanda · Tesis MLOps</title>
   <link rel="icon" href="data:,">
-  <script src="js/tema.js?v=46aee493"></script>
-  <link rel="stylesheet" href="estilos.css?v=46aee493">
-  <script src="vendor/chart.umd.min.js?v=46aee493" defer></script>
-  <script type="module" src="js/app.js?v=46aee493"></script>
+  <script src="js/tema.js?v=89e9a5fa"></script>
+  <link rel="stylesheet" href="estilos.css?v=89e9a5fa">
+  <script src="vendor/chart.umd.min.js?v=89e9a5fa" defer></script>
+  <script type="module" src="js/app.js?v=89e9a5fa"></script>
 </head>
 <body>
   <header class="encabezado">
@@ -89,6 +89,12 @@
               <span class="muestra muestra-anterior" aria-hidden="true"></span>Mismas semanas del año anterior
             </label>
           </li>
+          <li id="leyenda-pronostico-anterior" hidden>
+            <label>
+              <input type="checkbox" id="ver-pronostico-anterior" checked>
+              <span class="muestra muestra-pronostico-anterior" aria-hidden="true"></span>Pronóstico anterior
+            </label>
+          </li>
         </ul>
         <div class="lienzo">
           <canvas id="grafica" role="img" aria-label="Gráfica de la venta real y el pronóstico de la serie elegida"></canvas>
@@ -96,6 +102,11 @@
         <p class="nota">
           Índice: 100 es la venta semanal promedio del total en las 52 semanas reales que muestra la gráfica. Todas las
           series usan esa misma escala: una serie en 5 vende el 5 % de una semana promedio del total.
+        </p>
+        <p class="nota" id="nota-venta-real" hidden>
+          Después del corte, la venta real aparece a medida que cierran las semanas pronosticadas.
+          <span id="nota-pronostico-anterior" hidden>Antes del corte, el pronóstico anterior es el que estaba vigente en
+          cada semana, hecho en un origen previo.</span>
         </p>
         <details>
           <summary>Ver los datos de la gráfica</summary>
@@ -114,7 +125,12 @@
           en índice: 100 = semana promedio del total en las 52 semanas reales. «Contra año anterior» es la variación del
           trimestre completo, en %.
         </p>
-        <div class="desplazable" id="meses" aria-describedby="unidad-meses"></div>
+        <p class="subtitulo" id="nota-real-meses" hidden>
+          Debajo de cada pronóstico va la venta real del periodo cuando cierra, también como semana promedio, y la
+          diferencia: (pronóstico − real) / real, positiva si se pronosticó de más, como el sesgo de la tabla de modelos.
+          Mientras el periodo no cierra, dice «pendiente».
+        </p>
+        <div class="desplazable" id="meses" aria-describedby="unidad-meses nota-real-meses"></div>
         <div id="exportar-meses"></div>
         <p class="nota nota-abajo">
           Cada mes es un periodo de 31, 30 y 30 días desde el lunes siguiente al corte, no un mes del calendario. Se

@@ -2,12 +2,16 @@
 //
 // El formato de results.json lo define tesis-mlops en src/common/results_schema.py. Aquí solo se revisa lo que la
 // página necesita para no dibujar datos mal; si algo no cuadra, se lanza ErrorDatos con un mensaje para el lector.
+//
+// La venta real del horizonte (real_hasta y, en cada serie, real_horizonte, ventanas_real y pronostico_anterior) llegó
+// después dentro de la versión 1: los archivos de antes no la traen y la página se ve como antes (ver tieneVentaReal).
 
 export const VERSION_MANIFEST = 1;
 export const VERSIONES_ESQUEMA = [1];
 export const METRICAS_ESTANDAR = ["wape_m1", "wape_m2", "wape_total", "mape_m1", "mape_m2", "mape_total", "sesgo_total"];
 export const METRICAS_COMPLEMENTO = ["wape_tipo_mes", "mae", "rmse"];
 const NIVELES = ["total", "submarca", "serie"];
+const CAMPOS_VENTA_REAL = ["real_horizonte", "ventanas_real", "pronostico_anterior"]; // en cada serie, con real_hasta
 const DIAS_ANIO = 364; // 52 semanas: la misma semana del año anterior, también de lunes a domingo
 
 const ID = /^[a-z0-9-]+$/;
@@ -69,6 +73,29 @@ function revisarValores(problemas, ruta, valores, largo, que) {
   if (!Array.isArray(valores) || valores.length !== largo || !valores.every(esIndice)) {
     problemas.push(`${ruta}: tiene que traer ${largo} números mayores o iguales a 0, uno por ${que}`);
   }
+}
+
+/** Como revisarValores, pero con null donde el valor no se conoce. Con `conocidos`, el valor va justo donde dice. */
+function revisarConNulos(problemas, ruta, valores, largo, que, conocidos = null) {
+  if (!Array.isArray(valores) || valores.length !== largo || !valores.every((v) => v === null || esIndice(v))) {
+    problemas.push(`${ruta}: tiene que traer ${largo} valores, números mayores o iguales a 0 o null, uno por ${que}`);
+  } else if (conocidos && valores.some((valor, i) => (valor !== null) !== conocidos[i])) {
+    problemas.push(`${ruta}: tiene que traer valor justo en lo que cerró hasta real_hasta y null en lo demás`);
+  }
+}
+
+/** Si el archivo trae la venta real del horizonte. Los de antes no la traen, y la página se ve como antes. */
+export const tieneVentaReal = (resultados) => "real_hasta" in resultados;
+
+/**
+ * Qué semanas y qué meses del pronóstico ya cerraron hasta real_hasta (el último domingo con venta real): ahí va la
+ * venta real y en el resto, null.
+ */
+export function cerrados({ real_hasta: hasta, semanas, ventanas }) {
+  return {
+    semanas: semanas.pronostico.map((semana) => sumarDias(semana, 6) <= hasta),
+    ventanas: ventanas.map((ventana) => ventana.hasta <= hasta),
+  };
 }
 
 /**
@@ -170,6 +197,17 @@ export function revisarResultados(resultados, entrada = null) {
   const conVentanas = revisarLista(problemas, "ventanas", resultados.ventanas, (ventana, ruta) =>
     revisarCampos(problemas, ruta, ventana, { numero: esEntero, desde: esFecha, hasta: esFecha, dias: esEntero }),
   );
+  // la venta real del horizonte: todo o nada; si viene, cada valor justo en lo que cerró hasta real_hasta
+  const conVentaReal = tieneVentaReal(resultados);
+  const hasta = resultados.real_hasta;
+  if (conVentaReal && !esFecha(hasta)) problemas.push("real_hasta: no es una fecha");
+  else if (conVentaReal && esFecha(resultados.corrida?.datos_hasta) && hasta < resultados.corrida.datos_hasta) {
+    problemas.push("real_hasta: es anterior a datos_hasta");
+  }
+  const conocidos =
+    conVentaReal && esFecha(hasta) && conSemanas && conVentanas && resultados.ventanas.every(esObjeto)
+      ? cerrados(resultados)
+      : null;
   revisarLista(problemas, "series", resultados.series, (serie, ruta) => {
     if (!revisarCampos(problemas, ruta, serie, { nivel: (v) => NIVELES.includes(v), nombre: esTexto })) return;
     if (conSemanas) {
@@ -177,6 +215,22 @@ export function revisarResultados(resultados, entrada = null) {
       revisarValores(problemas, `${ruta}/pronostico`, serie.pronostico, semanas.pronostico.length, "semana de pronóstico");
     }
     if (conVentanas) revisarValores(problemas, `${ruta}/ventanas`, serie.ventanas, resultados.ventanas.length, "mes");
+    if (!conVentaReal) {
+      const sueltos = CAMPOS_VENTA_REAL.filter((campo) => campo in serie);
+      if (sueltos.length) problemas.push(`${ruta}: trae ${sueltos.join(", ")}, pero el archivo no trae real_hasta`);
+      return;
+    }
+    if (conSemanas) {
+      const [horizonte, reales] = [semanas.pronostico.length, semanas.real.length];
+      const anteriores = serie.pronostico_anterior;
+      revisarConNulos(problemas, `${ruta}/real_horizonte`, serie.real_horizonte, horizonte, "semana de pronóstico",
+        conocidos?.semanas);
+      revisarConNulos(problemas, `${ruta}/pronostico_anterior`, anteriores, reales, "semana real");
+    }
+    if (conVentanas) {
+      const meses = resultados.ventanas.length;
+      revisarConNulos(problemas, `${ruta}/ventanas_real`, serie.ventanas_real, meses, "mes", conocidos?.ventanas);
+    }
   });
   if (Array.isArray(resultados.series)) {
     const totales = resultados.series.filter((serie) => serie?.nivel === "total").length;
@@ -212,27 +266,89 @@ export function anioAnterior(resultados, serie) {
   });
 }
 
+/** Cuántas semanas pronosticadas ya tienen venta real. Null si el archivo no trae la venta real del horizonte. */
+export function semanasConVentaReal(resultados) {
+  return tieneVentaReal(resultados) ? cerrados(resultados).semanas.filter(Boolean).length : null;
+}
+
+/**
+ * Las semanas de la gráfica de una serie, en orden: las 52 reales y las del pronóstico. Cada una trae la venta real,
+ * el pronóstico, la venta del año anterior y el pronóstico anterior (el que estaba vigente, de un origen previo), con
+ * null donde no hay. `pendiente` marca las semanas pronosticadas que todavía no cierran. Sin la venta real del
+ * horizonte (archivos de antes), después del origen no hay venta real, no hay pronóstico anterior y nada queda pendiente.
+ */
+export function semanasGrafica(resultados, serie) {
+  const conVentaReal = tieneVentaReal(resultados);
+  const previo = anioAnterior(resultados, serie);
+  return [
+    ...resultados.semanas.real.map((semana, i) => ({
+      semana,
+      tipo: "real",
+      real: serie.real[i],
+      pronostico: null,
+      anioAnterior: null,
+      pronosticoAnterior: conVentaReal ? serie.pronostico_anterior[i] : null,
+      pendiente: false,
+    })),
+    ...resultados.semanas.pronostico.map((semana, i) => ({
+      semana,
+      tipo: "pronostico",
+      real: conVentaReal ? serie.real_horizonte[i] : null,
+      pronostico: serie.pronostico[i],
+      anioAnterior: previo[i],
+      pronosticoAnterior: null,
+      pendiente: conVentaReal && serie.real_horizonte[i] === null,
+    })),
+  ];
+}
+
+/** Si alguna semana trae pronóstico anterior: las semanas con valor son las mismas en todas las series. */
+export function tienePronosticoAnterior(resultados) {
+  return tieneVentaReal(resultados) && resultados.series.some((s) => s.pronostico_anterior.some((v) => v !== null));
+}
+
 const suma = (valores) => valores.reduce((total, valor) => total + valor, 0);
 
 /** Un periodo de `dias` días llevado a semana promedio: la misma escala de la gráfica, donde 100 es una semana promedio. */
 export const semanaPromedio = (valor, dias) => (valor * 7) / dias;
 
+/** (pronóstico − real) / real, como el sesgo: positiva si se pronosticó de más. Null sin venta real (o si es 0). */
+export const diferencia = (pronostico, real) => (real ? pronostico / real - 1 : null);
+
 /**
  * La fila de la vista por mes de una serie: semana promedio de cada mes y del trimestre. El año anterior se compara
  * solo en el trimestre: la venta real viene por semana y hay semanas partidas entre dos meses, así que por mes sería
  * una aproximación. Si falta alguna de las semanas del año anterior, la comparación queda vacía.
+ *
+ * Si el archivo trae la venta real del horizonte, la fila trae además, por mes y en el trimestre, la venta real como
+ * semana promedio y la diferencia con el pronóstico; null mientras el periodo no cierra (el trimestre, hasta que cierran
+ * los tres meses). Sin ella, `real` es null y la vista se ve como antes.
  */
 export function filaPorMes(resultados, serie) {
   const semanas = serie.pronostico.length;
   const trimestre = suma(serie.pronostico) / semanas;
   const previo = anioAnterior(resultados, serie);
   const base = previo.every((valor) => valor !== null) ? suma(previo) / semanas : null;
+  const dias = resultados.ventanas.map((ventana) => ventana.dias);
+  let real = null;
+  if (tieneVentaReal(resultados)) {
+    const reales = serie.ventanas_real;
+    const completo = reales.every((valor) => valor !== null);
+    const [pronosticado, vendido] = [suma(serie.ventanas), completo ? suma(reales) : null];
+    real = {
+      meses: reales.map((valor, i) => (valor === null ? null : semanaPromedio(valor, dias[i]))),
+      diferencias: reales.map((valor, i) => (valor === null ? null : diferencia(serie.ventanas[i], valor))),
+      trimestre: completo ? semanaPromedio(vendido, suma(dias)) : null,
+      diferenciaTrimestre: completo ? diferencia(pronosticado, vendido) : null,
+    };
+  }
   return {
     serie,
-    meses: serie.ventanas.map((valor, i) => semanaPromedio(valor, resultados.ventanas[i].dias)),
+    meses: serie.ventanas.map((valor, i) => semanaPromedio(valor, dias[i])),
     trimestre,
     anioAnterior: base,
     variacion: base ? trimestre / base - 1 : null,
+    real,
   };
 }
 
@@ -277,9 +393,14 @@ export function ubicar(arbol, nombre) {
 
 const redondear = (valor) => Math.round(valor * 10) / 10; // el índice viene con 1 decimal
 
-/** Lo que le falta a `padre` para sumar `partes`, valor por valor; nunca negativo (el redondeo puede pasarse). */
+/**
+ * Lo que le falta a `padre` para sumar `partes`, valor por valor; nunca negativo (el redondeo puede pasarse). Null
+ * donde el padre es null: lo que no se conoce no se conoce en ninguna serie.
+ */
 function resto(padre, partes, campo) {
-  return padre[campo].map((valor, i) => Math.max(0, redondear(valor - suma(partes.map((p) => p[campo][i])))));
+  return padre[campo].map((valor, i) =>
+    valor === null ? null : Math.max(0, redondear(valor - suma(partes.map((p) => p[campo][i])))),
+  );
 }
 
 /**
@@ -293,12 +414,11 @@ export function desglose(resultados, serie) {
   if (serie.nivel !== "submarca") return [];
   const propias = grupos.serie.filter((s) => submarcaDe(s.nombre) === serie.nombre);
   if (!propias.length) return [];
+  const campos = ["real", "pronostico", "ventanas", ...(tieneVentaReal(resultados) ? CAMPOS_VENTA_REAL : [])];
   const otras = {
     nivel: "otras",
     nombre: `Otras series de ${serie.nombre}`,
-    real: resto(serie, propias, "real"),
-    pronostico: resto(serie, propias, "pronostico"),
-    ventanas: resto(serie, propias, "ventanas"),
+    ...Object.fromEntries(campos.map((campo) => [campo, resto(serie, propias, campo)])),
   };
   const vacia = ["real", "pronostico", "ventanas"].every((campo) => otras[campo].every((valor) => valor === 0));
   return vacia ? propias : [...propias, otras];

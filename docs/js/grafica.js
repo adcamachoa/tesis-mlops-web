@@ -1,9 +1,10 @@
 // La gráfica de venta real y pronóstico, con Chart.js (vendor/chart.umd.min.js, que se carga antes que este módulo).
 // Los colores salen de las variables de estilos.css, así que siguen el modo claro u oscuro. Además del color, cada línea
-// tiene su trazo: continua la venta real, a rayas el pronóstico y punteada el año anterior.
+// tiene su trazo: continua la venta real, a rayas el pronóstico, punteada el año anterior y de raya y punto, en un azul
+// más tenue, el pronóstico anterior. La venta real sigue después del corte en las semanas pronosticadas que ya cerraron.
 
-import { anioAnterior } from "./datos.js?v=46aee493";
-import { fecha, fechaCorta, indice, nombreSerie } from "./formato.js?v=46aee493";
+import { semanasGrafica } from "./datos.js?v=89e9a5fa";
+import { fecha, fechaCorta, indice, nombreSerie } from "./formato.js?v=89e9a5fa";
 
 const FUENTE = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 const OSCURO = window.matchMedia("(prefers-color-scheme: dark)");
@@ -14,6 +15,7 @@ function colores() {
   return {
     real: variable("--linea-real"),
     pronostico: variable("--linea-pronostico"),
+    pronosticoAnterior: variable("--linea-pronostico-anterior"),
     anterior: variable("--linea-anterior"),
     superficie: variable("--superficie"),
     texto: variable("--texto"),
@@ -82,29 +84,37 @@ function linea(etiqueta, datos, color, extra) {
   };
 }
 
-function configuracion(resultados, serie, verAnterior) {
+function configuracion(resultados, serie, ver) {
   const c = colores();
-  const { real, pronostico } = resultados.semanas;
-  const vacios = (n) => Array(n).fill(null);
+  const semanas = semanasGrafica(resultados, serie);
+  const columna = (campo) => semanas.map((semana) => semana[campo]);
   // el pronóstico arranca en la última semana real para que las dos líneas se unan; ese punto no va en el tooltip
-  const union = real.length - 1;
+  const union = resultados.semanas.real.length - 1;
+  const pronostico = columna("pronostico").map((valor, i) => (i === union ? serie.real[union] : valor));
   const anillo = { pointHoverBorderColor: c.superficie };
   return {
     type: "line",
     data: {
-      labels: [...real, ...pronostico],
+      labels: columna("semana"),
       datasets: [
-        linea("Pronóstico", [...vacios(union), serie.real[union], ...serie.pronostico], c.pronostico, {
+        linea("Pronóstico", pronostico, c.pronostico, {
           ...anillo,
           borderDash: [6, 4],
           order: 0,
         }),
-        linea("Venta real", [...serie.real, ...vacios(pronostico.length)], c.real, { ...anillo, order: 1 }),
-        linea("Año anterior", [...vacios(real.length), ...anioAnterior(resultados, serie)], c.anterior, {
+        linea("Venta real", columna("real"), c.real, { ...anillo, order: 1 }),
+        linea("Año anterior", columna("anioAnterior"), c.anterior, {
           ...anillo,
           borderDash: [1, 4],
-          hidden: !verAnterior,
+          hidden: !ver.anioAnterior,
           order: 2,
+        }),
+        // raya y punto: con las puntas redondas, la raya de 7 y el punto de 1 se ven de 9 y 3, con 3 entre ellos
+        linea("Pronóstico anterior", columna("pronosticoAnterior"), c.pronosticoAnterior, {
+          ...anillo,
+          borderDash: [7, 5, 1, 5],
+          hidden: !ver.pronosticoAnterior,
+          order: 3,
         }),
       ],
     },
@@ -168,17 +178,18 @@ export function crearGrafica(lienzo) {
   let actual = null;
 
   function dibujar() {
-    const { resultados, serie, verAnterior } = actual;
+    const { resultados, serie, ver } = actual;
     grafica?.destroy();
     window.Chart.defaults.font.family = FUENTE;
-    grafica = new window.Chart(lienzo, configuracion(resultados, serie, verAnterior));
+    grafica = new window.Chart(lienzo, configuracion(resultados, serie, ver));
     lienzo.setAttribute("aria-label", `Venta real y pronóstico de ${nombreSerie(serie.nombre)}, en índice`);
   }
 
   OSCURO.addEventListener("change", () => actual && dibujar());
   return {
-    mostrar(resultados, serie, verAnterior) {
-      actual = { resultados, serie, verAnterior };
+    /** `ver` dice qué líneas de referencia se muestran: `{ anioAnterior, pronosticoAnterior }`. */
+    mostrar(resultados, serie, ver) {
+      actual = { resultados, serie, ver };
       dibujar();
     },
     redibujar() {

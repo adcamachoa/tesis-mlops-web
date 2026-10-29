@@ -3,7 +3,7 @@
 // pronóstico. La serie elegida filtra toda la página, salvo la tabla de modelos, que results.json solo trae para el
 // backtest completo.
 
-import { DATOS } from "../config.js?v=46aee493";
+import { DATOS } from "../config.js?v=89e9a5fa";
 import {
   ErrorDatos,
   desglose,
@@ -12,13 +12,15 @@ import {
   jerarquia,
   revisarManifest,
   revisarResultados,
+  tienePronosticoAnterior,
+  tieneVentaReal,
   ubicar,
   urlPronostico,
-} from "./datos.js?v=46aee493";
-import { exportarComplemento, exportarGrafica, exportarModelos, exportarPorMes } from "./exportar.js?v=46aee493";
-import { fecha, nombreSerie } from "./formato.js?v=46aee493";
-import { crearGrafica } from "./grafica.js?v=46aee493";
-import { TIPO_XLSX, libroXlsx } from "./xlsx.js?v=46aee493";
+} from "./datos.js?v=89e9a5fa";
+import { exportarComplemento, exportarGrafica, exportarModelos, exportarPorMes } from "./exportar.js?v=89e9a5fa";
+import { fecha, nombreSerie } from "./formato.js?v=89e9a5fa";
+import { crearGrafica } from "./grafica.js?v=89e9a5fa";
+import { TIPO_XLSX, libroXlsx } from "./xlsx.js?v=89e9a5fa";
 import {
   botonExportar,
   botonesSerie,
@@ -31,7 +33,7 @@ import {
   tablaDatosGrafica,
   tablaModelos,
   tablaPorMes,
-} from "./secciones.js?v=46aee493";
+} from "./secciones.js?v=89e9a5fa";
 
 const $ = (id) => document.getElementById(id);
 const URL_MANIFEST = new URL("manifest.json", new URL(DATOS.url, document.baseURI));
@@ -165,6 +167,12 @@ function mostrar(resultados) {
     }),
   );
   $("botones-serie").replaceChildren(...botonesSerie(actual.arbol, (nombre) => elegirSerie(nombre)));
+  // la venta real del horizonte y el pronóstico anterior solo vienen en los archivos nuevos
+  for (const id of ["leyenda-pronostico-anterior", "nota-pronostico-anterior"]) {
+    $(id).hidden = !tienePronosticoAnterior(resultados);
+  }
+  $("nota-venta-real").hidden = !tieneVentaReal(resultados);
+  $("nota-real-meses").hidden = !tieneVentaReal(resultados);
   $("pie-escala").textContent = `Escala: ${resultados.escala}.`;
   $("pie-generado").textContent = `Datos generados el ${fecha(resultados.generado)}.`;
   $("estado").hidden = true;
@@ -197,7 +205,10 @@ function elegirSerie(nombre, desdeLaTabla = false) {
   $("serie-meses").textContent = nombreSerie(nombre);
   $("t-resumen-serie").textContent = `${nombreSerie(nombre)} · ${resultados.semanas.pronostico.length} semanas pronosticadas`;
   $("resumen-serie").replaceChildren(resumenSerie(fila, resultados));
-  grafica.mostrar(resultados, serie, $("ver-anio-anterior").checked);
+  grafica.mostrar(resultados, serie, {
+    anioAnterior: $("ver-anio-anterior").checked,
+    pronosticoAnterior: $("ver-pronostico-anterior").checked,
+  });
   $("datos-grafica").replaceChildren(tablaDatosGrafica(resultados, serie));
   $("exportar-grafica").replaceChildren(
     botonExportar(() => descargar(exportarGrafica(resultados, serie, OPCIONES_EXPORTAR))),
@@ -218,7 +229,9 @@ async function iniciar() {
   grafica = crearGrafica($("grafica"));
   prepararTema();
   $("serie-detalle").addEventListener("change", (evento) => elegirSerie(evento.target.value));
-  $("ver-anio-anterior").addEventListener("change", () => actual && elegirSerie(actual.serie));
+  for (const casilla of ["ver-anio-anterior", "ver-pronostico-anterior"]) {
+    $(casilla).addEventListener("change", () => actual && elegirSerie(actual.serie));
+  }
   try {
     entradas = revisarManifest(await leerJson(URL_MANIFEST, "la lista de pronósticos"));
   } catch (error) {
