@@ -6,6 +6,7 @@ import { fecha, fechaCorta, indice, nombreSerie, porcentaje, variacion } from ".
 
 const MAXIMO_DETALLES = 8;
 const GRUPOS = { total: "Total", submarca: "Submarcas", serie: "Series principales" };
+const CIEN = "100 = semana promedio del total";
 
 /** Un elemento con sus atributos (`clase` es className) y sus hijos; null y false se saltan. */
 export function el(etiqueta, atributos = {}, ...hijos) {
@@ -188,15 +189,12 @@ export function tablaDatosGrafica(resultados, serie) {
     ...real.map((semana, i) => [semana, serie.real[i], null, null]),
     ...pronostico.map((semana, i) => [semana, null, serie.pronostico[i], previo[i]]),
   ];
+  const columnas = ["Semana del", "Venta real (índice)", "Pronóstico (índice)", "Año anterior (índice)"];
   return el(
     "table",
     {},
-    el("caption", { clase: "nota" }, `${nombreSerie(serie.nombre)}, en índice`),
-    el(
-      "thead",
-      {},
-      el("tr", {}, ["Semana del", "Venta real", "Pronóstico", "Año anterior"].map((texto) => el("th", { scope: "col" }, texto))),
-    ),
+    el("caption", { clase: "nota" }, `${nombreSerie(serie.nombre)}: venta semanal en índice (${CIEN})`),
+    el("thead", {}, el("tr", {}, columnas.map((texto) => el("th", { scope: "col" }, texto)))),
     el(
       "tbody",
       {},
@@ -207,43 +205,68 @@ export function tablaDatosGrafica(resultados, serie) {
   );
 }
 
-/** La vista por mes: una fila por serie, agrupadas por nivel. Elegir una fila llama a `alElegir` con su nombre. */
-export function tablaPorMes(filas, ventanas, elegida, alElegir) {
+function encabezado(titulo, ...subtitulos) {
+  return [titulo, ...subtitulos.map((texto) => el("span", { clase: "subtitulo-columna" }, texto))];
+}
+
+function filaMeses(fila, nombre, atributos = {}) {
+  return el(
+    "tr",
+    atributos,
+    el("th", { scope: "row", clase: "nombre-serie" }, nombre),
+    fila.meses.map((valor) => el("td", {}, indice(valor))),
+    el("td", { clase: "separador" }, indice(fila.trimestre)),
+    el("td", { title: fila.variacion === null ? "Faltan semanas del año anterior" : null }, variacion(fila.variacion)),
+  );
+}
+
+/**
+ * La vista por mes de la serie elegida (`fila`) y, debajo, su desglose (`partes`). Elegir una fila del desglose llama
+ * a `alElegir` con su nombre; la fila de "Otras series" no se puede elegir, porque no está en el archivo.
+ */
+export function tablaPorMes(fila, partes, resultados, alElegir) {
+  const { ventanas, semanas } = resultados;
   const columnas = ventanas.length + 3;
-  const encabezado = el(
+  const unidad = "semana promedio, índice";
+  const meses = ventanas.map((ventana, i) => {
+    const periodo = `${fechaCorta(ventana.desde)} al ${fechaCorta(ventana.hasta)} · ${ventana.dias} días`;
+    return el("th", { scope: "col" }, encabezado(`Mes ${i + 1}`, unidad, periodo));
+  });
+  const trimestre = encabezado("Trimestre", unidad, `${semanas.pronostico.length} semanas`);
+  const titulos = el(
     "tr",
     {},
     el("th", { scope: "col" }, "Serie"),
-    ventanas.map(columnaMes),
-    el("th", { scope: "col", clase: "separador" }, "Trimestre", el("span", { clase: "subtitulo-columna" }, "13 semanas")),
-    el("th", { scope: "col" }, "Contra año anterior", el("span", { clase: "subtitulo-columna" }, "trimestre")),
+    meses,
+    el("th", { scope: "col", clase: "separador" }, trimestre),
+    el("th", { scope: "col" }, encabezado("Contra año anterior", "variación del trimestre, %")),
   );
-  const cuerpo = Object.entries(GRUPOS).flatMap(([nivel, titulo]) => {
-    const delNivel = filas.filter((fila) => fila.serie.nivel === nivel);
-    if (!delNivel.length) return [];
-    return [
-      el("tr", { clase: "grupo" }, el("th", { scope: "colgroup", colspan: columnas }, titulo)),
-      ...delNivel.map((fila) => {
-        const nombre = fila.serie.nombre;
-        const boton = el("button", { type: "button", clase: "boton-serie" }, nombreSerie(nombre));
-        boton.addEventListener("click", () => alElegir(nombre));
-        return el(
-          "tr",
-          { "aria-current": nombre === elegida ? "true" : null },
-          el("th", { scope: "row", clase: "nombre-serie" }, boton),
-          fila.meses.map((valor) => el("td", {}, indice(valor))),
-          el("td", { clase: "separador" }, indice(fila.trimestre)),
-          el("td", { title: fila.variacion === null ? "Faltan semanas del año anterior" : null }, variacion(fila.variacion)),
-        );
-      }),
-    ];
+  // dentro del desglose de una submarca, sus series se nombran sin repetirla
+  const prefijo = fila.serie.nivel === "submarca" ? `${fila.serie.nombre} | ` : null;
+  const nombreCorto = (nombre) => nombreSerie(prefijo && nombre.startsWith(prefijo) ? nombre.slice(prefijo.length) : nombre);
+  const desglosadas = partes.map((parte) => {
+    if (parte.serie.nivel === "otras") {
+      const aclaracion = "La submarca menos las series de la lista: results.json solo trae las series de más venta.";
+      const nombre = el("span", { title: aclaracion }, nombreSerie(parte.serie.nombre));
+      return filaMeses(parte, nombre, { clase: "fila-otras" });
+    }
+    const boton = el("button", { type: "button", clase: "boton-serie" }, nombreCorto(parte.serie.nombre));
+    boton.addEventListener("click", () => alElegir(parte.serie.nombre));
+    return filaMeses(parte, boton);
   });
-  return el("table", {}, el("thead", {}, encabezado), el("tbody", {}, cuerpo));
-}
-
-function columnaMes(ventana, i) {
-  const periodo = `${fechaCorta(ventana.desde)} al ${fechaCorta(ventana.hasta)} · ${ventana.dias} días`;
-  return el("th", { scope: "col" }, `Mes ${i + 1}`, el("span", { clase: "subtitulo-columna" }, periodo));
+  const tituloDesglose = fila.serie.nivel === "total" ? "Desglose por submarca" : `Desglose de ${fila.serie.nombre} por serie`;
+  return el(
+    "table",
+    {},
+    el("thead", {}, titulos),
+    el(
+      "tbody",
+      {},
+      filaMeses(fila, nombreSerie(fila.serie.nombre), { "aria-current": "true" }),
+      desglosadas.length > 0 && el("tr", { clase: "grupo" }, el("th", { scope: "colgroup", colspan: columnas }, tituloDesglose)),
+      desglosadas,
+    ),
+  );
 }
 
 /** El mensaje de error para el lector, con el detalle de lo que falló si lo hay. */
