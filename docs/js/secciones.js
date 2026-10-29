@@ -1,8 +1,8 @@
 // Arma el resumen, las tablas y los mensajes de la página. Todo el texto que viene de los datos entra como texto
 // (append de strings), nunca como HTML.
 
-import { ErrorDatos, anioAnterior } from "./datos.js?v=46aee493";
-import { fecha, fechaCorta, indice, nombreDentroDe, nombreSerie, porcentaje, variacion } from "./formato.js?v=46aee493";
+import { ErrorDatos, semanasConVentaReal, semanasGrafica, tieneVentaReal } from "./datos.js?v=89e9a5fa";
+import { fecha, fechaCorta, indice, nombreDentroDe, nombreSerie, porcentaje, variacion } from "./formato.js?v=89e9a5fa";
 
 const MAXIMO_DETALLES = 8;
 const COLUMNAS_MODELOS = ["wape_m1", "wape_m2", "wape_total", "sesgo_total"]; // sin MAPE
@@ -25,11 +25,23 @@ export function etiquetaPronostico(entrada) {
   return entrada.soportado ? texto : `${texto} (formato v${entrada.version_esquema}, no soportado)`;
 }
 
-export function resumen({ champion, corrida, backtest, semanas, ventanas }) {
+/** "2 de 13 semanas pronosticadas": cuántas ya tienen venta real. */
+function semanasConReal(cerradas, total) {
+  return cerradas === 0 ? "todavía ninguna semana pronosticada" : `${cerradas} de ${total} semanas pronosticadas`;
+}
+
+export function resumen(resultados) {
+  const { champion, corrida, backtest, semanas, ventanas } = resultados;
+  const cerradas = semanasConVentaReal(resultados);
   const datos = [
     ["Modelo champion", [el("code", {}, champion.modelo)], `versión ${champion.version}`],
     ["Fecha del pronóstico", [fecha(corrida.fecha_prediccion)], `entrenado el ${fecha(corrida.fecha_entrenamiento)}`],
     ["Datos hasta", [fecha(corrida.datos_hasta)], `origen: semana del ${fecha(corrida.origen)}`],
+    cerradas !== null && [
+      "Venta real hasta",
+      [fecha(resultados.real_hasta)],
+      semanasConReal(cerradas, semanas.pronostico.length),
+    ],
     [
       "Periodo pronosticado",
       [`${fecha(semanas.pronostico[0])} al ${fecha(ventanas.at(-1).hasta)}`],
@@ -40,7 +52,7 @@ export function resumen({ champion, corrida, backtest, semanas, ventanas }) {
       [`${backtest.origenes} orígenes`],
       `del ${fecha(backtest.primer_origen)} al ${fecha(backtest.ultimo_origen)}`,
     ],
-  ];
+  ].filter(Boolean);
   return el(
     "dl",
     { clase: "resumen" },
@@ -189,15 +201,26 @@ export function resumenSerie(fila, { semanas, ventanas }) {
   );
 }
 
-/** La tabla con los datos de la gráfica, semana por semana. */
+/**
+ * La tabla con los datos de la gráfica, semana por semana. Si el archivo trae la venta real del horizonte, suma el
+ * pronóstico anterior y dice "pendiente" en las semanas pronosticadas que todavía no cierran.
+ */
 export function tablaDatosGrafica(resultados, serie) {
-  const { real, pronostico } = resultados.semanas;
-  const previo = anioAnterior(resultados, serie);
-  const filas = [
-    ...real.map((semana, i) => [semana, serie.real[i], null, null]),
-    ...pronostico.map((semana, i) => [semana, null, serie.pronostico[i], previo[i]]),
-  ];
-  const columnas = ["Semana del", "Venta real (índice)", "Pronóstico (índice)", "Año anterior (índice)"];
+  const conVentaReal = tieneVentaReal(resultados);
+  const columnas = [
+    "Semana del",
+    "Venta real (índice)",
+    "Pronóstico (índice)",
+    "Año anterior (índice)",
+    conVentaReal && "Pronóstico anterior (índice)",
+  ].filter(Boolean);
+  const filas = semanasGrafica(resultados, serie).map((s) => [
+    s.semana,
+    s.pendiente ? "pendiente" : indice(s.real),
+    indice(s.pronostico),
+    indice(s.anioAnterior),
+    conVentaReal && indice(s.pronosticoAnterior),
+  ]);
   return el(
     "table",
     {},
@@ -207,7 +230,12 @@ export function tablaDatosGrafica(resultados, serie) {
       "tbody",
       {},
       filas.map(([semana, ...valores]) =>
-        el("tr", {}, el("th", { scope: "row", clase: "numero" }, fecha(semana)), valores.map((v) => el("td", {}, indice(v)))),
+        el(
+          "tr",
+          {},
+          el("th", { scope: "row", clase: "numero" }, fecha(semana)),
+          valores.filter((v) => v !== false).map((v) => el("td", {}, v)),
+        ),
       ),
     ),
   );
@@ -217,13 +245,31 @@ function encabezado(titulo, ...subtitulos) {
   return [titulo, ...subtitulos.map((texto) => el("span", { clase: "subtitulo-columna" }, texto))];
 }
 
+const DIFERENCIA = "Diferencia: (pronóstico − real) / real, positiva si se pronosticó de más";
+
+/**
+ * Debajo del pronóstico de un periodo, su venta real y la diferencia, o "pendiente" si el periodo no ha cerrado. Nada
+ * si el archivo no trae la venta real del horizonte.
+ */
+function realDelPeriodo(real, diferenciaReal) {
+  if (real === undefined) return null;
+  if (real === null) return el("span", { clase: "real-periodo pendiente" }, "pendiente");
+  return el(
+    "span",
+    { clase: "real-periodo" },
+    `real ${indice(real)} · `,
+    el("span", { title: DIFERENCIA }, variacion(diferenciaReal)),
+  );
+}
+
 function filaMeses(fila, nombre, atributos = {}) {
+  const { real } = fila;
   return el(
     "tr",
     atributos,
     el("th", { scope: "row", clase: "nombre-serie" }, nombre),
-    fila.meses.map((valor) => el("td", {}, indice(valor))),
-    el("td", { clase: "separador" }, indice(fila.trimestre)),
+    fila.meses.map((valor, i) => el("td", {}, indice(valor), realDelPeriodo(real?.meses[i], real?.diferencias[i]))),
+    el("td", { clase: "separador" }, indice(fila.trimestre), realDelPeriodo(real?.trimestre, real?.diferenciaTrimestre)),
     el("td", { title: fila.variacion === null ? "Faltan semanas del año anterior" : null }, variacion(fila.variacion)),
   );
 }

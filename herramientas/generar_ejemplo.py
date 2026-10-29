@@ -19,6 +19,10 @@ from types import SimpleNamespace
 RAIZ = Path(__file__).resolve().parent.parent
 SEMILLA = 2026
 ORIGENES = (date(2026, 9, 14), date(2026, 10, 12))  # lunes de la última semana con venta real de cada pronóstico
+# el último domingo con venta real, el mismo en todos los archivos, como en la exportación semanal: 2 semanas después
+# del origen más reciente, para probar el caso a mitad del horizonte. El del 14-sep ya tiene su mes 1 cerrado.
+REAL_HASTA = ORIGENES[-1] + timedelta(days=6 + 14)
+GENERADO = datetime.combine(REAL_HASTA + timedelta(days=1), time(10, 0))  # el lunes siguiente, cuando se exporta
 SEMANAS_REALES = 52
 SERIES_TOP = 20
 SERIES_POR_SUBMARCA = 20
@@ -111,8 +115,18 @@ def pronostico(serie: dict, origen: date, h: int) -> float:
     return patron(serie, lunes) * SESGO_PRONOSTICO[origen] * ruido(RUIDO_PRONOSTICO, serie["nombre"], origen, h)
 
 
+def pronostico_vigente(serie: dict, origen: date, lunes: date, horizonte: int) -> float | None:
+    """El pronóstico que estaba vigente para la semana `lunes`: el del origen anterior a `origen` más reciente cuyo
+    horizonte la cubre, como en export_results.py. None si ninguno la cubría."""
+    for anterior in sorted((o for o in ORIGENES if o < origen), reverse=True):
+        h = (lunes - anterior).days // 7
+        if 1 <= h <= horizonte:
+            return pronostico(serie, anterior, h)
+    return None
+
+
 def por_ventana(semanal: list[float], ventanas_dias) -> list[float]:
-    """Reparte el pronóstico de cada semana entre las ventanas, 1/7 por día."""
+    """Reparte la venta o el pronóstico de cada semana entre las ventanas, 1/7 por día."""
     ventana_del_dia = [v for v, dias in enumerate(ventanas_dias) for _ in range(dias)]
     total = [0.0] * len(ventanas_dias)
     for dia, ventana in enumerate(ventana_del_dia):
@@ -151,31 +165,52 @@ def metricas(origen: date, tm: SimpleNamespace, celda_promedio: float) -> list[d
 
 
 def construir_resultados(origen: date, series: list[dict], tm: SimpleNamespace) -> dict:
-    """Un results.json sintético con la forma que arma export_results.py en tesis-mlops."""
+    """Un results.json sintético con la forma que arma export_results.py en tesis-mlops.
+
+    Todo va en el índice de este archivo, también el pronóstico anterior, que sale del pronóstico de otro origen: la
+    página nunca compara valores entre archivos. Después del origen solo hay venta real en las semanas y las ventanas
+    que cerraron hasta REAL_HASTA; la de cada ventana sale de repartir cada semana 1/7 por día."""
     semanas = [origen - timedelta(weeks=SEMANAS_REALES - 1 - i) for i in range(SEMANAS_REALES)]
     horizonte = range(1, tm.horizonte + 1)
+    semanas_pronostico = [origen + timedelta(weeks=h) for h in horizonte]
     real = {s["nombre"]: [venta_real(s, lunes) for lunes in semanas] for s in series}
     semanal = {s["nombre"]: [pronostico(s, origen, h) for h in horizonte] for s in series}
     ventanas = {nombre: por_ventana(valores, tm.ventanas_dias) for nombre, valores in semanal.items()}
+    real_horizonte = {s["nombre"]: [venta_real(s, lunes) for lunes in semanas_pronostico] for s in series}
+    ventanas_real = {nombre: por_ventana(valores, tm.ventanas_dias) for nombre, valores in real_horizonte.items()}
+    vigente = {s["nombre"]: [pronostico_vigente(s, origen, lunes, tm.horizonte) for lunes in semanas] for s in series}
     factor = tm.esquema.BASE_INDICE * SEMANAS_REALES / sum(map(sum, real.values()))
 
-    def serie(nivel: str, nombre: str, miembros: list[str]) -> dict:
-        def suma(tabla: dict) -> list[float]:
-            return [round(sum(v) * factor, DECIMALES_INDICE) for v in zip(*(tabla[m] for m in miembros))]
-
-        return {"nivel": nivel, "nombre": nombre, "real": suma(real), "pronostico": suma(semanal),
-                "ventanas": suma(ventanas)}
-
-    principales = sorted(real, key=lambda nombre: sum(real[nombre]), reverse=True)[:SERIES_TOP]
     lunes = origen + timedelta(weeks=1)
     fines = [sum(tm.ventanas_dias[: i + 1]) for i in range(len(tm.ventanas_dias))]
+    hasta_ventanas = [lunes + timedelta(days=fin - 1) for fin in fines]
+    # qué se conoce: las semanas y ventanas cerradas hasta REAL_HASTA, y las semanas que cubría un pronóstico anterior
+    cerradas = [semana + timedelta(days=6) <= REAL_HASTA for semana in semanas_pronostico]
+    ventanas_cerradas = [hasta <= REAL_HASTA for hasta in hasta_ventanas]
+    cubiertas = [valor is not None for valor in next(iter(vigente.values()))]
+
+    def serie(nivel: str, nombre: str, miembros: list[str]) -> dict:
+        def suma(tabla: dict, conocidas: list[bool] | None = None) -> list[float | None]:
+            """Con `conocidas`, null donde el valor todavía no se conoce."""
+            columnas = zip(*(tabla[m] for m in miembros))
+            valores = [round(sum(v or 0 for v in c) * factor, DECIMALES_INDICE) for c in columnas]
+            if conocidas is None:
+                return valores
+            return [v if conocida else None for v, conocida in zip(valores, conocidas, strict=True)]
+
+        return {"nivel": nivel, "nombre": nombre, "real": suma(real), "pronostico": suma(semanal),
+                "ventanas": suma(ventanas), "real_horizonte": suma(real_horizonte, cerradas),
+                "pronostico_anterior": suma(vigente, cubiertas), "ventanas_real": suma(ventanas_real, ventanas_cerradas)}
+
+    principales = sorted(real, key=lambda nombre: sum(real[nombre]), reverse=True)[:SERIES_TOP]
     dia_corrida = origen + timedelta(days=16)
     total_ventanas = sum(sum(v) for v in ventanas.values()) * factor
     champion, version = CHAMPION[origen]
     return {
         "version_esquema": tm.esquema.VERSION,
-        "generado": datetime.combine(dia_corrida, time(10, 0)).isoformat(),
+        "generado": GENERADO.isoformat(),
         "escala": tm.esquema.ESCALA,
+        "real_hasta": REAL_HASTA.isoformat(),
         "corrida": {
             "fecha_prediccion": datetime.combine(dia_corrida, time(9, 30)).isoformat(),
             "fecha_entrenamiento": datetime.combine(dia_corrida, time(8, 10)).isoformat(),
@@ -195,8 +230,8 @@ def construir_resultados(origen: date, series: list[dict], tm: SimpleNamespace) 
         },
         "ventanas": [
             {"numero": i + 1, "desde": (lunes + timedelta(days=fin - dias)).isoformat(),
-             "hasta": (lunes + timedelta(days=fin - 1)).isoformat(), "dias": dias}
-            for i, (dias, fin) in enumerate(zip(tm.ventanas_dias, fines))
+             "hasta": hasta.isoformat(), "dias": dias}
+            for i, (dias, fin, hasta) in enumerate(zip(tm.ventanas_dias, fines, hasta_ventanas))
         ],
         "series": [
             serie("total", "Total", list(real)),

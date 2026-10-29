@@ -19,6 +19,16 @@ Los datos son anónimos. La venta y el pronóstico van como índice (100 = la se
 
 Un pronóstico. Su formato lo define `src/common/results_schema.py` en `tesis-mlops` (`version_esquema: 1`). La página revisa lo que necesita antes de dibujar. Si llega una versión que no conoce, o un archivo que no tiene la forma esperada, muestra un mensaje claro y no dibuja nada.
 
+**Venta real del horizonte.** Desde la fase 9b de `tesis-mlops`, la venta real se actualiza cada semana y `results.json` trae 4 campos más. Siguen en la versión 1, todos en el mismo índice del archivo:
+
+- **`real_hasta`:** el último domingo con venta real. Es el mismo en todos los archivos de una corrida.
+- **En cada serie:**
+  - **`real_horizonte`:** 13 valores, la venta real de cada semana pronosticada. Es null hasta que la semana cierra.
+  - **`ventanas_real`:** 3 valores, la venta real de cada ventana, desde la venta diaria. Es null hasta que la ventana cierra.
+  - **`pronostico_anterior`:** uno por semana real. Es el pronóstico que estaba vigente en esa semana, del origen anterior más reciente que la cubría, o null si no hubo. Las semanas con valor son las mismas en todas las series.
+
+La página revisa que cada valor esté justo en lo que cerró hasta `real_hasta`. Los archivos de antes no traen estos campos, y con ellos la página se ve como antes. Si los campos vienen a medias, muestra un mensaje en vez de dibujar.
+
 ### `manifest.json`
 
 Lista los pronósticos disponibles. La página arma el selector a partir de él. Formato versión 1, implementado en `tesis-mlops`:
@@ -83,17 +93,23 @@ Una barra bajo el encabezado, fija arriba en escritorio, tiene tres controles:
 - **Pronóstico:** el origen que se muestra, si hay más de uno.
 - **Tema:** *Sistema*, *Claro* u *Oscuro*. Por defecto sigue al sistema operativo. La elección se guarda solo en el navegador de quien la hace (`localStorage`), y `js/tema.js` la aplica antes de dibujar la página para que no parpadee.
 
-1. **Resumen:** las cifras de la serie elegida en las 13 semanas pronosticadas (semana promedio del pronóstico, la del año anterior y la variación) y los datos de la corrida: modelo champion y versión, fecha del pronóstico, datos hasta, periodo pronosticado y backtest.
+1. **Resumen:** las cifras de la serie elegida en las 13 semanas pronosticadas (semana promedio del pronóstico, la del año anterior y la variación) y los datos de la corrida: modelo champion y versión, fecha del pronóstico, datos hasta, venta real hasta (con cuántas semanas pronosticadas ya la tienen), periodo pronosticado y backtest.
 2. **Modelos en el backtest:** WAPE de mes 1, mes 2 y total, más el sesgo total, con el champion y el mejor marcados. El complemento (WAPE tipo × mes, MAE y RMSE) va en un desplegable. Son las métricas del backtest completo a nivel tipo de producto y no cambian con la serie. El MAPE viene en `results.json`, pero la página no lo muestra.
 3. **Venta real y pronóstico** de la serie elegida: 52 semanas reales, 13 de pronóstico y las mismas semanas del año anterior. Abajo hay una tabla con los datos de la gráfica, en índice.
+   - **Venta real después del corte:** la línea sigue hasta `real_hasta`, en las semanas pronosticadas que ya cerraron.
+   - **Pronóstico anterior:** en las semanas reales, el pronóstico que estaba vigente, de un origen previo. Va con raya y punto en un azul más tenue que el del pronóstico vigente, que va a rayas. Tiene una casilla en la leyenda y se ve por defecto.
+   - En la tabla de datos, las semanas pronosticadas que no han cerrado dicen "pendiente".
 4. **Pronóstico por mes** de la serie elegida, contraído por defecto (se abre con un clic en el título): cada mes como semana promedio en índice (el pronóstico del periodo entre sus días, por 7) y el trimestre contra el año anterior, en %. Un texto arriba de la tabla aclara que es el pronóstico, no una métrica de error. Debajo va el desglose, y al elegir una fila toda la página pasa a esa serie.
+   - **Venta real de cada mes:** debajo de cada pronóstico va la venta real del mes cuando la ventana cierra, también como semana promedio, y la diferencia en %. Mientras no cierra, dice "pendiente". El trimestre la trae cuando cierran los tres meses.
+   - **Diferencia:** (pronóstico − real) / real, positiva si se pronosticó de más, como el sesgo de la tabla de modelos.
    - **Total:** se desglosa en sus submarcas, que lo suman.
    - **Submarca:** se desglosa en sus series principales más "Otras series", que es la submarca menos esas series, porque `results.json` solo trae las 20 de más venta.
    - **Serie:** no se desglosa.
 
 **Exportar a Excel.** Cada tabla tiene un botón que la descarga como `.xlsx`. Las tablas son modelos, métricas complementarias, datos de la gráfica y pronóstico por mes.
 
-- **Qué trae cada archivo:** una hoja con las mismas columnas de la página, con los números como números y su formato (índice, %, fechas), y una hoja "Notas" con la tabla, la serie, el pronóstico, la escala y la fuente.
+- **Qué trae cada archivo:** una hoja con las mismas columnas de la página, con los números como números y su formato (índice, %, fechas), y una hoja "Notas" con la tabla, la serie, el pronóstico, la venta real hasta, la escala y la fuente.
+- **Venta real del horizonte:** en el pronóstico por mes, cada periodo lleva tres columnas: pronóstico, venta real y diferencia. Lo que no ha cerrado dice "pendiente".
 - **Serie elegida:** las tablas de la gráfica y del pronóstico por mes salen de la serie elegida.
 - **Sin dependencias:** el archivo se arma en el navegador con `js/xlsx.js`.
 
@@ -139,6 +155,11 @@ Para regenerar los datos sintéticos hace falta `../tesis-mlops` y Python con pa
 ```
 python herramientas/generar_ejemplo.py
 ```
+
+El ejemplo simula la exportación del lunes 2-nov-2026, con venta real hasta el 1-nov.
+
+- **Origen 12-oct:** 2 semanas pronosticadas con venta real, ningún mes cerrado y 4 semanas de pronóstico anterior, que viene del origen 14-sep.
+- **Origen 14-sep:** 6 semanas con venta real, el mes 1 cerrado y sin pronóstico anterior.
 
 El script valida cada `results.json` con `validar` de `tesis-mlops` antes de escribir. Si alguno no cumple el esquema, no escribe nada. De `tesis-mlops` solo lee, sin dejar `__pycache__` allá.
 

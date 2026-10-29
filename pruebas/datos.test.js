@@ -1,5 +1,5 @@
 // Pruebas de docs/js/datos.js: la página lee el ejemplo sintético, rechaza con un mensaje claro lo que no sabe leer y
-// hace bien los cálculos de la vista por mes.
+// hace bien los cálculos de la vista por mes. Los archivos de antes, sin la venta real del horizonte, se leen como antes.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
@@ -7,7 +7,9 @@ import { describe, test } from "node:test";
 import {
   ErrorDatos,
   anioAnterior,
+  cerrados,
   desglose,
+  diferencia,
   elegirPronostico,
   filaPorMes,
   jerarquia,
@@ -15,8 +17,12 @@ import {
   revisarManifest,
   revisarResultados,
   semanaPromedio,
+  semanasConVentaReal,
+  semanasGrafica,
   submarcaDe,
   sumarDias,
+  tienePronosticoAnterior,
+  tieneVentaReal,
   ubicar,
   urlPronostico,
 } from "../docs/js/datos.js";
@@ -26,6 +32,16 @@ const leer = (ruta) => JSON.parse(readFileSync(new URL(ruta, EJEMPLO), "utf8"));
 const MANIFEST = leer("manifest.json");
 const RESULTADOS = Object.fromEntries(MANIFEST.pronosticos.map((p) => [p.id, leer(p.ruta)]));
 const RECIENTE = RESULTADOS["2026-10-12"];
+const ANTERIOR = RESULTADOS["2026-09-14"];
+const CAMPOS_VENTA_REAL = ["real_horizonte", "ventanas_real", "pronostico_anterior"];
+
+/** El mismo archivo como venían antes: sin real_hasta ni la venta real del horizonte. */
+function sinVentaReal(resultados) {
+  return cambiado(resultados, (r) => {
+    delete r.real_hasta;
+    for (const serie of r.series) for (const campo of CAMPOS_VENTA_REAL) delete serie[campo];
+  });
+}
 
 /** Que `funcion` lance ErrorDatos con `texto` en el mensaje o en alguno de los detalles. */
 function rechaza(funcion, texto) {
@@ -137,6 +153,99 @@ describe("results.json", () => {
     const [reciente, anterior] = revisarManifest(MANIFEST);
     rechaza(() => revisarResultados(RESULTADOS[anterior.id], reciente), "no corresponde al pronóstico de la lista");
   });
+
+  test("un archivo de antes, sin la venta real del horizonte, se sigue leyendo", () => {
+    const viejo = sinVentaReal(RECIENTE);
+    assert.equal(revisarResultados(viejo), viejo);
+    assert.equal(tieneVentaReal(viejo), false);
+    assert.equal(tieneVentaReal(RECIENTE), true);
+  });
+
+  const VENTA_REAL = {
+    "real_hasta que no es fecha": [(r) => (r.real_hasta = "1-nov"), "real_hasta: no es una fecha"],
+    "real_hasta antes de datos_hasta": [(r) => (r.real_hasta = "2026-10-11"), "real_hasta: es anterior a datos_hasta"],
+    "venta real en una semana que no cerró": [
+      (r) => (r.series[0].real_horizonte[2] = 50),
+      "series/0/real_horizonte: tiene que traer valor justo en lo que cerró",
+    ],
+    "sin la venta real de una semana cerrada": [
+      (r) => (r.series[1].real_horizonte[0] = null),
+      "series/1/real_horizonte: tiene que traer valor justo en lo que cerró",
+    ],
+    "un mes con venta real antes de cerrar": [
+      (r) => (r.series[0].ventanas_real[0] = 80),
+      "series/0/ventanas_real: tiene que traer valor justo en lo que cerró",
+    ],
+    "venta real negativa": [(r) => (r.series[0].real_horizonte[0] = -1), "series/0/real_horizonte: tiene que traer 13"],
+    "pronóstico anterior con otro largo": [
+      (r) => r.series[1].pronostico_anterior.pop(),
+      "series/1/pronostico_anterior: tiene que traer 52 valores",
+    ],
+    "una serie sin sus campos": [(r) => delete r.series[3].ventanas_real, "series/3/ventanas_real: tiene que traer 3"],
+    "los campos sin real_hasta": [
+      (r) => delete r.real_hasta,
+      "series/0: trae real_horizonte, ventanas_real, pronostico_anterior, pero el archivo no trae real_hasta",
+    ],
+  };
+  for (const [nombre, [cambio, texto]] of Object.entries(VENTA_REAL)) {
+    test(`venta real del horizonte, se rechaza: ${nombre}`, () =>
+      rechaza(() => revisarResultados(cambiado(RECIENTE, cambio)), texto));
+  }
+
+  test("un mes cerrado lleva su venta real: en el del 14-sep cerró el mes 1", () => {
+    assert.deepEqual(cerrados(ANTERIOR).ventanas, [true, false, false]);
+    assert.ok(ANTERIOR.series.every((s) => s.ventanas_real[0] !== null));
+    rechaza(
+      () => revisarResultados(cambiado(ANTERIOR, (r) => (r.series[2].ventanas_real[0] = null))),
+      "series/2/ventanas_real: tiene que traer valor justo",
+    );
+  });
+});
+
+describe("venta real del horizonte", () => {
+  const [total] = porNivel(RECIENTE.series).total;
+
+  test("el ejemplo está a mitad del horizonte: 2 semanas con venta real en el 12-oct y 6 en el 14-sep", () => {
+    assert.equal(RECIENTE.real_hasta, "2026-11-01");
+    assert.equal(semanasConVentaReal(RECIENTE), 2);
+    assert.equal(semanasConVentaReal(ANTERIOR), 6);
+    assert.deepEqual(cerrados(RECIENTE).ventanas, [false, false, false]);
+    assert.equal(semanasConVentaReal(sinVentaReal(RECIENTE)), null);
+  });
+
+  test("la gráfica sigue con la venta real después del origen y deja pendiente el resto", () => {
+    const semanas = semanasGrafica(RECIENTE, total);
+    assert.equal(semanas.length, 52 + 13);
+    const horizonte = semanas.slice(52);
+    assert.deepEqual(horizonte.map((s) => s.real), total.real_horizonte);
+    assert.deepEqual(horizonte.map((s) => s.pendiente), total.real_horizonte.map((v) => v === null));
+    assert.deepEqual(horizonte.map((s) => s.anioAnterior), anioAnterior(RECIENTE, total));
+    assert.ok(semanas.slice(0, 52).every((s) => !s.pendiente && s.pronostico === null));
+  });
+
+  test("el pronóstico anterior va solo en las semanas reales que cubría un origen previo", () => {
+    const anteriores = semanasGrafica(RECIENTE, total).map((s) => s.pronosticoAnterior);
+    assert.deepEqual(anteriores.slice(0, 52), total.pronostico_anterior);
+    assert.equal(anteriores.slice(0, 52).filter((v) => v !== null).length, 4); // del 21-sep al 12-oct
+    assert.ok(anteriores.slice(52).every((v) => v === null));
+    assert.equal(tienePronosticoAnterior(RECIENTE), true);
+    assert.equal(tienePronosticoAnterior(ANTERIOR), false); // no hubo un origen antes del 14-sep
+  });
+
+  test("sin la venta real del horizonte, la gráfica es la de antes", () => {
+    const viejo = sinVentaReal(RECIENTE);
+    const semanas = semanasGrafica(viejo, porNivel(viejo.series).total[0]);
+    assert.ok(semanas.slice(52).every((s) => s.real === null && !s.pendiente));
+    assert.ok(semanas.every((s) => s.pronosticoAnterior === null));
+    assert.equal(tienePronosticoAnterior(viejo), false);
+  });
+
+  test("la diferencia es la del sesgo: positiva si se pronosticó de más", () => {
+    assert.ok(Math.abs(diferencia(110, 100) - 0.1) < 1e-12);
+    assert.ok(Math.abs(diferencia(90, 100) + 0.1) < 1e-12);
+    assert.equal(diferencia(5, 0), null);
+    assert.equal(diferencia(5, null), null);
+  });
 });
 
 describe("cálculos", () => {
@@ -189,6 +298,33 @@ describe("cálculos", () => {
     assert.equal(fila.variacion, null);
   });
 
+  test("sin la venta real del horizonte, la fila por mes no la trae", () => {
+    assert.equal(filaPorMes(CHICO, CHICO.series[0]).real, null);
+  });
+
+  test("con la venta real, cada mes cerrado la trae como semana promedio, con su diferencia; el resto, null", () => {
+    const conReal = cambiado(CHICO, (r) => {
+      r.real_hasta = "2026-10-25";
+      r.series[0].ventanas_real = [110, null];
+    });
+    const { real } = filaPorMes(conReal, conReal.series[0]);
+    assert.deepEqual(real.meses, [110, null]);
+    assert.deepEqual(real.diferencias, [99 / 110 - 1, null]);
+    assert.equal(real.trimestre, null); // hasta que cierran todos los meses
+    assert.equal(real.diferenciaTrimestre, null);
+  });
+
+  test("cuando cierran todos los meses, el trimestre también trae su venta real", () => {
+    const conReal = cambiado(CHICO, (r) => {
+      r.real_hasta = "2026-11-08";
+      r.series[0].ventanas_real = [110, 80];
+    });
+    const { real } = filaPorMes(conReal, conReal.series[0]);
+    assert.deepEqual(real.meses, [110, 56]);
+    assert.equal(real.trimestre, (190 * 7) / 17);
+    assert.equal(real.diferenciaTrimestre, 199 / 190 - 1);
+  });
+
   test("en el ejemplo, el trimestre por semana cuadra con la suma de los tres meses", () => {
     for (const serie of RECIENTE.series) {
       const fila = filaPorMes(RECIENTE, serie);
@@ -199,14 +335,21 @@ describe("cálculos", () => {
 });
 
 describe("desglose", () => {
-  const CAMPOS = ["real", "pronostico", "ventanas"];
+  const CAMPOS = ["real", "pronostico", "ventanas", ...CAMPOS_VENTA_REAL];
   const grupos = porNivel(RECIENTE.series);
 
-  /** Que las `partes` sumen `serie` valor por valor, con la tolerancia del redondeo a 1 decimal de cada una. */
+  /**
+   * Que las `partes` sumen `serie` valor por valor, con la tolerancia del redondeo a 1 decimal de cada una. Donde la
+   * serie es null (lo que todavía no se conoce), las partes también.
+   */
   function sumanLaSerie(serie, partes) {
     const tolerancia = 0.05 * (partes.length + 1) + 1e-9;
     for (const campo of CAMPOS) {
       serie[campo].forEach((valor, i) => {
+        if (valor === null) {
+          assert.ok(partes.every((parte) => parte[campo][i] === null), `${serie.nombre} ${campo}[${i}]: null`);
+          return;
+        }
         const suma = partes.reduce((total, parte) => total + parte[campo][i], 0);
         assert.ok(Math.abs(valor - suma) <= tolerancia, `${serie.nombre} ${campo}[${i}]: ${valor} contra ${suma}`);
       });
@@ -231,9 +374,24 @@ describe("desglose", () => {
       assert.equal(otras.nivel, "otras");
       assert.equal(otras.nombre, `Otras series de ${submarca.nombre}`);
       assert.ok(resto.length > 0 && resto.every((s) => s.nombre.startsWith(`${submarca.nombre} | `)));
-      assert.ok(CAMPOS.every((campo) => otras[campo].every((valor) => valor >= 0)));
+      assert.ok(CAMPOS.every((campo) => otras[campo].every((valor) => valor === null || valor >= 0)));
       sumanLaSerie(submarca, partes);
     }
+  });
+
+  test("con un mes cerrado, «Otras series» también trae su venta real", () => {
+    const [submarca] = porNivel(ANTERIOR.series).submarca;
+    const partes = desglose(ANTERIOR, submarca);
+    assert.notEqual(partes.at(-1).ventanas_real[0], null);
+    sumanLaSerie(submarca, partes);
+    assert.notEqual(filaPorMes(ANTERIOR, partes.at(-1)).real.meses[0], null);
+  });
+
+  test("sin la venta real del horizonte, «Otras series» no la trae", () => {
+    const viejo = sinVentaReal(RECIENTE);
+    const otras = desglose(viejo, porNivel(viejo.series).submarca[0]).at(-1);
+    assert.equal(otras.nivel, "otras");
+    assert.ok(CAMPOS_VENTA_REAL.every((campo) => !(campo in otras)));
   });
 
   test("una serie no se desglosa", () => {

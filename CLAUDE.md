@@ -4,6 +4,7 @@ Página estática y pública de los pronósticos de [tesis-mlops](https://github
 
 ## Reglas
 
+- **Todo en español.** Las respuestas en la conversación, los commits, los PR, los documentos y los textos de la página van siempre en español.
 - **Repo público y anónimo.** No pueden aparecer nombres de marcas ni de empresas en el código, los documentos, los commits ni la página. Los datos ya llegan anonimizados: submarcas en código y jerarquía con nombres genéricos.
 - **Nunca piezas.** La página solo muestra el índice que trae `results.json`. No hay que reconstruir piezas ni pedir datos en piezas.
 - **Sin secretos.** Este repo no tiene tokens ni acceso a Databricks. Solo lee los JSON públicos que publica `tesis-mlops`.

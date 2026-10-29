@@ -16,6 +16,7 @@
   --resaltado: rgba(42, 120, 214, 0.1);
   --linea-real: #52514e;
   --linea-pronostico: #2a78d6;
+  --linea-pronostico-anterior: #3987e5; /* más tenue que el vigente, con 3,5:1 sobre la superficie */
   --linea-anterior: #898781;
   --aviso-fondo: #fff4d6;
   --aviso-borde: #fab219;
@@ -39,6 +40,7 @@
     --resaltado: rgba(57, 135, 229, 0.18);
     --linea-real: #a8a79f;
     --linea-pronostico: #3987e5;
+    --linea-pronostico-anterior: #256abf; /* más tenue que el vigente, con 3,2:1 sobre la superficie */
     --linea-anterior: #76756f;
     --aviso-fondo: #2e2510;
   }
@@ -58,6 +60,7 @@
   --resaltado: rgba(57, 135, 229, 0.18);
   --linea-real: #a8a79f;
   --linea-pronostico: #3987e5;
+  --linea-pronostico-anterior: #256abf;
   --linea-anterior: #76756f;
   --aviso-fondo: #2e2510;
 }
@@ -369,6 +372,14 @@ h2 {
 
 .nota-abajo {
   margin: 16px 0 0;
+}
+
+/* la venta real del periodo, debajo de su pronóstico en la vista por mes */
+.real-periodo {
+  display: block;
+  color: var(--texto-2);
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 .etiqueta-titulo {
@@ -707,6 +718,19 @@ details[open] summary {
 .muestra-anterior {
   border-top-style: dotted;
   border-top-color: var(--linea-anterior);
+}
+
+/* raya y punto, como su línea en la gráfica: un borde no tiene ese trazo, así que va como fondo */
+.muestra-pronostico-anterior {
+  height: 2px;
+  border-top: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--linea-pronostico-anterior) 0 8px,
+    transparent 8px 11px,
+    var(--linea-pronostico-anterior) 11px 13px,
+    transparent 13px 16px
+  );
 }
 
 .lienzo {
