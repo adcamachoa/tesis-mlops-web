@@ -9,6 +9,9 @@ function numero(valor, opciones) {
   return texto.replace("-", "−"); // el signo menos tipográfico, del mismo ancho que el +
 }
 
+/** Un número con los decimales que traiga, hasta 2: 0,5. */
+export const cifra = (valor) => numero(valor, { maximumFractionDigits: 2 });
+
 /** Un valor del índice, por defecto con 1 decimal: 98,4. */
 export const indice = (valor, decimales = 1) =>
   numero(valor, { minimumFractionDigits: decimales, maximumFractionDigits: decimales });
@@ -33,8 +36,17 @@ export const fechaCorta = (texto) => fecha(texto).slice(0, -5);
 /** "Submarca A | Departamento 1 | Tipo 3" → "Submarca A › Departamento 1 › Tipo 3". */
 export const nombreSerie = (nombre) => nombre.split(" | ").join(" › ");
 
-/** El nombre de una serie sin repetir la submarca `padre` que la contiene: "Departamento 1 › Tipo 3". */
-export function nombreDentroDe(nombre, padre) {
-  const prefijo = `${padre} | `;
-  return nombreSerie(nombre.startsWith(prefijo) ? nombre.slice(prefijo.length) : nombre);
-}
+const NIVELES = {
+  total: "total",
+  submarca: "submarca",
+  departamento: "departamento",
+  categoria: "categoría",
+  serie: "tipo de producto",
+  otras: "«Otras»",
+};
+
+/** El nivel de un nodo de la versión 2, para el texto: "categoria" → "categoría", "serie" → "tipo de producto". */
+export const nombreNivel = (nivel) => NIVELES[nivel] ?? nivel;
+
+/** Dónde está medida una tabla de un nodo: "nivel departamento" o, para «Otras», "grupo «Otras»". */
+export const enNivel = (nivel) => (nivel === "otras" ? "grupo «Otras»" : `nivel ${nombreNivel(nivel)}`);

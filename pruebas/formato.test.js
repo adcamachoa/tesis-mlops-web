@@ -4,10 +4,12 @@ import { test } from "node:test";
 
 import {
   VACIO,
+  cifra,
+  enNivel,
   fecha,
   fechaCorta,
   indice,
-  nombreDentroDe,
+  nombreNivel,
   nombreSerie,
   porcentaje,
   variacion,
@@ -43,7 +45,14 @@ test("los niveles del nombre de una serie se separan con ›", () => {
   assert.equal(nombreSerie("Total"), "Total");
 });
 
-test("dentro de su submarca, una serie se nombra sin repetirla", () => {
-  assert.equal(nombreDentroDe("Submarca A | Departamento 1 | Tipo 3", "Submarca A"), "Departamento 1 › Tipo 3");
-  assert.equal(nombreDentroDe("Submarca A | Departamento 1 | Tipo 3", "Submarca B"), "Submarca A › Departamento 1 › Tipo 3");
+test("el nivel de un nodo se nombra para el texto", () => {
+  assert.equal(nombreNivel("categoria"), "categoría");
+  assert.equal(nombreNivel("serie"), "tipo de producto");
+  assert.equal(enNivel("departamento"), "nivel departamento");
+  assert.equal(enNivel("otras"), "grupo «Otras»");
+});
+
+test("el mínimo publicado va con sus decimales", () => {
+  assert.equal(cifra(0.5), "0,5");
+  assert.equal(cifra(2), "2");
 });

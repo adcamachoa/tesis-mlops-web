@@ -8,10 +8,10 @@
   <meta name="description" content="Pronóstico de demanda semanal de la tesis de maestría en MLOps: modelo champion, comparación de modelos y pronóstico por serie y por mes.">
   <title>Pronóstico de demanda · Tesis MLOps</title>
   <link rel="icon" href="data:,">
-  <script src="js/tema.js?v=89e9a5fa"></script>
-  <link rel="stylesheet" href="estilos.css?v=89e9a5fa">
-  <script src="vendor/chart.umd.min.js?v=89e9a5fa" defer></script>
-  <script type="module" src="js/app.js?v=89e9a5fa"></script>
+  <script src="js/tema.js?v=06557bc6"></script>
+  <link rel="stylesheet" href="estilos.css?v=06557bc6">
+  <script src="vendor/chart.umd.min.js?v=06557bc6" defer></script>
+  <script type="module" src="js/app.js?v=06557bc6"></script>
 </head>
 <body>
   <header class="encabezado">
@@ -22,16 +22,14 @@
     </div>
   </header>
 
-  <!-- el segmentador de serie filtra toda la página, salvo la tabla de modelos; en escritorio la barra queda fija -->
+  <!-- el segmentador de serie filtra toda la página, salvo la comparación oficial de modelos; en escritorio la barra
+       queda fija -->
   <div class="barra">
     <div class="contenedor barra-interior">
       <div class="segmentador" id="selector-serie" hidden>
         <span class="etiqueta-control" id="t-serie">Serie</span>
         <div class="botones-segmento" id="botones-serie" role="group" aria-labelledby="t-serie"></div>
-        <div class="selector" id="selector-detalle" hidden>
-          <label for="serie-detalle" id="t-detalle"></label>
-          <select id="serie-detalle"></select>
-        </div>
+        <div class="listas-serie" id="listas-serie"></div>
       </div>
       <div class="barra-derecha">
         <div class="selector" id="selector-pronostico" hidden>
@@ -51,6 +49,13 @@
     <span class="aviso-icono" aria-hidden="true">!</span>
     <span><strong>Datos sintéticos de ejemplo.</strong> No son pronósticos reales: sirven para probar la página.</span>
   </p>
+  <!-- al cambiar de pronóstico, si la serie elegida no se publica por separado en el nuevo, se muestra su grupo -->
+  <div role="status">
+    <p class="aviso" id="aviso-nodo" hidden>
+      <span class="aviso-icono" aria-hidden="true">!</span>
+      <span id="aviso-nodo-texto"></span>
+    </p>
+  </div>
 
   <main class="contenedor">
     <noscript><p class="estado">Esta página necesita JavaScript para mostrar los pronósticos.</p></noscript>
@@ -65,17 +70,40 @@
         <div id="resumen"></div>
       </section>
 
+      <!-- data-version: lo que se muestra solo con esa versión de results.json -->
       <section class="tarjeta" aria-labelledby="t-modelos">
-        <h2 id="t-modelos">Modelos en el backtest <span class="etiqueta etiqueta-titulo">No cambia con la serie</span></h2>
-        <p class="nota-fija">
+        <h2 id="t-modelos">
+          Modelos en el backtest
+          <span class="etiqueta etiqueta-titulo" data-version="1">No cambia con la serie</span>
+        </h2>
+        <p class="nota-fija" data-version="1">
           Son las métricas del backtest completo, a nivel tipo de producto, y no cambian con la serie elegida:
           results.json todavía no trae métricas por serie.
+        </p>
+        <h3 class="subtitulo-modelos" data-version="2">
+          Comparación oficial · nivel tipo de producto
+          <span class="etiqueta etiqueta-titulo">No cambia con la serie</span>
+        </h3>
+        <p class="nota-fija" data-version="2">
+          Con esta comparación se elige el modelo: el backtest completo, medido en cada tipo de producto.
         </p>
         <p class="nota">
           En WAPE, menor es mejor. El sesgo es positivo si el modelo pronosticó de más. <em>Mejor</em> es el de menor
           WAPE tipo × mes; el <em>champion</em> es el modelo que hizo este pronóstico.
         </p>
         <div id="modelos"></div>
+        <div class="modelos-nodo" data-version="2">
+          <h3 class="subtitulo-modelos" id="t-modelos-nodo"></h3>
+          <p class="nota-fija">
+            Las mismas métricas, con la venta y el pronóstico de cada origen y mes del backtest sumados a la serie
+            elegida. El champion es el de la comparación oficial.
+          </p>
+          <p class="nota">
+            El WAPE baja al subir de nivel: al sumar series, los errores de signo contrario se compensan. Compara los
+            modelos dentro de esta tabla, no con la oficial ni con la de otro nivel.
+          </p>
+          <div id="modelos-nodo"></div>
+        </div>
       </section>
 
       <section class="tarjeta" aria-labelledby="t-grafica" id="seccion-grafica">
@@ -138,6 +166,11 @@
           distinto largo en la misma escala de la gráfica. El año anterior se compara solo en el trimestre: la venta real
           viene por semana y dos semanas quedan partidas entre dos meses. Elige una fila del desglose para ver esa serie
           en toda la página.
+        </p>
+        <p class="nota nota-abajo" data-version="2">
+          Solo se publican por separado los grupos que venden en promedio <span id="indice-minimo"></span> o más de
+          índice por semana, en las 52 semanas reales. «Otras» junta lo que no se publica por separado, así que las
+          partes de un grupo siempre suman el grupo. Si eso no se puede, el grupo no se desglosa.
         </p>
       </details>
     </div>
