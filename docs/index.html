@@ -8,10 +8,10 @@
   <meta name="description" content="Pronóstico de demanda semanal de la tesis de maestría en MLOps: modelo champion, comparación de modelos y pronóstico por serie y por mes.">
   <title>Pronóstico de demanda · Tesis MLOps</title>
   <link rel="icon" href="data:,">
-  <script src="js/tema.js?v=06557bc6"></script>
-  <link rel="stylesheet" href="estilos.css?v=06557bc6">
-  <script src="vendor/chart.umd.min.js?v=06557bc6" defer></script>
-  <script type="module" src="js/app.js?v=06557bc6"></script>
+  <script src="js/tema.js?v=f407d825"></script>
+  <link rel="stylesheet" href="estilos.css?v=f407d825">
+  <script src="vendor/chart.umd.min.js?v=f407d825" defer></script>
+  <script type="module" src="js/app.js?v=f407d825"></script>
 </head>
 <body>
   <header class="encabezado">
@@ -22,8 +22,8 @@
     </div>
   </header>
 
-  <!-- el segmentador de serie filtra toda la página, salvo la comparación oficial de modelos; en escritorio la barra
-       queda fija -->
+  <!-- el segmentador de serie filtra toda la página (con la versión 1, salvo la tabla de modelos); en escritorio la
+       barra queda fija -->
   <div class="barra">
     <div class="contenedor barra-interior">
       <div class="segmentador" id="selector-serie" hidden>
@@ -73,37 +73,31 @@
       <!-- data-version: lo que se muestra solo con esa versión de results.json -->
       <section class="tarjeta" aria-labelledby="t-modelos">
         <h2 id="t-modelos">
-          Modelos en el backtest
+          Modelos en el backtest<span class="serie-titulo" id="serie-modelos"></span>
           <span class="etiqueta etiqueta-titulo" data-version="1">No cambia con la serie</span>
+          <span class="etiqueta etiqueta-titulo" data-version="2" id="nivel-modelos"></span>
         </h2>
         <p class="nota-fija" data-version="1">
           Son las métricas del backtest completo, a nivel tipo de producto, y no cambian con la serie elegida:
           results.json todavía no trae métricas por serie.
         </p>
-        <h3 class="subtitulo-modelos" data-version="2">
-          Comparación oficial · nivel tipo de producto
-          <span class="etiqueta etiqueta-titulo">No cambia con la serie</span>
-        </h3>
         <p class="nota-fija" data-version="2">
-          Con esta comparación se elige el modelo: el backtest completo, medido en cada tipo de producto.
+          Medidas en la serie elegida: la venta y el pronóstico de cada origen y mes del backtest, sumados a la serie.
+          El WAPE baja al subir de nivel, porque al sumar series los errores de signo contrario se compensan: compara
+          los modelos dentro de la tabla, no entre series de distinto nivel.
         </p>
-        <p class="nota">
+        <p class="nota" data-version="1">
           En WAPE, menor es mejor. El sesgo es positivo si el modelo pronosticó de más. <em>Mejor</em> es el de menor
           WAPE tipo × mes; el <em>champion</em> es el modelo que hizo este pronóstico.
         </p>
+        <p class="nota" data-version="2">
+          En WAPE, menor es mejor. El sesgo es positivo si el modelo pronosticó de más.
+          <span id="nota-mae">El MAE es el error promedio de un mes del backtest, en índice del mes completo, no de la
+          semana promedio.</span>
+          El <em>champion</em> es el modelo que hizo este pronóstico. Se eligió midiendo en cada tipo de producto, así
+          que no siempre tiene el menor WAPE de la tabla.
+        </p>
         <div id="modelos"></div>
-        <div class="modelos-nodo" data-version="2">
-          <h3 class="subtitulo-modelos" id="t-modelos-nodo"></h3>
-          <p class="nota-fija">
-            Las mismas métricas, con la venta y el pronóstico de cada origen y mes del backtest sumados a la serie
-            elegida. El champion es el de la comparación oficial.
-          </p>
-          <p class="nota">
-            El WAPE baja al subir de nivel: al sumar series, los errores de signo contrario se compensan. Compara los
-            modelos dentro de esta tabla, no con la oficial ni con la de otro nivel.
-          </p>
-          <div id="modelos-nodo"></div>
-        </div>
       </section>
 
       <section class="tarjeta" aria-labelledby="t-grafica" id="seccion-grafica">

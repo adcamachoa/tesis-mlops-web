@@ -1,10 +1,10 @@
 // Arranque de la página: lee manifest.json, arma la barra (segmentador de serie, pronóstico y tema) y muestra el
 // pronóstico elegido. La dirección de la página guarda el pronóstico (…/#2026-10-12), así que un enlace abre ese mismo
-// pronóstico. La serie elegida (un nodo del árbol) filtra toda la página, salvo la comparación oficial de modelos, que
-// es la del backtest completo. Al cambiar de pronóstico se mantiene la serie por su id o, si el nuevo no la publica por
-// separado, se muestra su grupo más cercano con un aviso.
+// pronóstico. La serie elegida (un nodo del árbol) filtra toda la página; con la versión 1, salvo la tabla de modelos,
+// que es la del backtest completo. Al cambiar de pronóstico se mantiene la serie por su id o, si el nuevo no la publica
+// por separado, se muestra su grupo más cercano con un aviso.
 
-import { DATOS } from "../config.js?v=06557bc6";
+import { DATOS } from "../config.js?v=f407d825";
 import {
   ErrorDatos,
   arbol,
@@ -15,20 +15,21 @@ import {
   metricasDelNodo,
   revisarManifest,
   revisarResultados,
+  tieneMesTresYMae,
   tienePronosticoAnterior,
   tieneVentaReal,
   urlPronostico,
-} from "./datos.js?v=06557bc6";
+} from "./datos.js?v=f407d825";
 import {
   exportarComplemento,
   exportarGrafica,
   exportarModelos,
   exportarModelosNodo,
   exportarPorMes,
-} from "./exportar.js?v=06557bc6";
-import { cifra, enNivel, fecha, nombreSerie } from "./formato.js?v=06557bc6";
-import { crearGrafica } from "./grafica.js?v=06557bc6";
-import { TIPO_XLSX, libroXlsx } from "./xlsx.js?v=06557bc6";
+} from "./exportar.js?v=f407d825";
+import { cifra, enNivel, fecha, nombreSerie } from "./formato.js?v=f407d825";
+import { crearGrafica } from "./grafica.js?v=f407d825";
+import { TIPO_XLSX, libroXlsx } from "./xlsx.js?v=f407d825";
 import {
   botonExportar,
   botonesSerie,
@@ -42,7 +43,7 @@ import {
   tablaModelos,
   tablaModelosNodo,
   tablaPorMes,
-} from "./secciones.js?v=06557bc6";
+} from "./secciones.js?v=f407d825";
 
 const $ = (id) => document.getElementById(id);
 const URL_MANIFEST = new URL("manifest.json", new URL(DATOS.url, document.baseURI));
@@ -184,12 +185,17 @@ function mostrar(resultados) {
     elemento.hidden = elemento.dataset.version !== version;
   }
   $("resumen").replaceChildren(resumen(resultados));
-  $("modelos").replaceChildren(
-    ...tablaModelos(resultados.metricas, {
-      alExportar: () => descargar(exportarModelos(resultados, OPCIONES_EXPORTAR)),
-      alExportarComplemento: () => descargar(exportarComplemento(resultados, OPCIONES_EXPORTAR)),
-    }),
-  );
+  // en la versión 2, la tabla de modelos es la de la serie elegida (ver mostrarSerie)
+  if (resultados.version_esquema === 1) {
+    $("modelos").replaceChildren(
+      ...tablaModelos(resultados.metricas, {
+        alExportar: () => descargar(exportarModelos(resultados, OPCIONES_EXPORTAR)),
+        alExportarComplemento: () => descargar(exportarComplemento(resultados, OPCIONES_EXPORTAR)),
+      }),
+    );
+    $("serie-modelos").textContent = "";
+  }
+  $("nota-mae").hidden = !tieneMesTresYMae(resultados);
   $("botones-serie").replaceChildren(...botonesSerie(nuevo, (otro) => elegirSerie(otro)));
   // la venta real del horizonte y el pronóstico anterior solo vienen en los archivos nuevos
   for (const elemento of ["leyenda-pronostico-anterior", "nota-pronostico-anterior"]) {
@@ -240,9 +246,13 @@ function mostrarSerie() {
   $("resumen-serie").replaceChildren(resumenSerie(fila, resultados));
   const metricas = metricasDelNodo(resultados, nodo);
   if (metricas) {
-    $("t-modelos-nodo").textContent = `En ${nombreSerie(nodo.nombre)} · ${enNivel(nodo.nivel)}`;
-    $("modelos-nodo").replaceChildren(
-      ...tablaModelosNodo(metricas, () => descargar(exportarModelosNodo(resultados, nodo, OPCIONES_EXPORTAR))),
+    $("serie-modelos").textContent = nombreSerie(nodo.nombre);
+    $("nivel-modelos").textContent = enNivel(nodo.nivel);
+    $("modelos").replaceChildren(
+      ...tablaModelosNodo(metricas, {
+        conMesTres: tieneMesTresYMae(resultados),
+        alExportar: () => descargar(exportarModelosNodo(resultados, nodo, OPCIONES_EXPORTAR)),
+      }),
     );
   }
   grafica.mostrar(resultados, nodo, {

@@ -1,11 +1,16 @@
 // Arma el resumen, las tablas y los mensajes de la página. Todo el texto que viene de los datos entra como texto
 // (append de strings), nunca como HTML.
 
-import { ErrorDatos, semanasConVentaReal, semanasGrafica, tieneVentaReal } from "./datos.js?v=06557bc6";
-import { fecha, fechaCorta, indice, nombreNivel, nombreSerie, porcentaje, variacion } from "./formato.js?v=06557bc6";
+import { ErrorDatos, semanasConVentaReal, semanasGrafica, tieneVentaReal } from "./datos.js?v=f407d825";
+import { fecha, fechaCorta, indice, nombreNivel, nombreSerie, porcentaje, variacion } from "./formato.js?v=f407d825";
 
 const MAXIMO_DETALLES = 8;
-const COLUMNAS_MODELOS = ["wape_m1", "wape_m2", "wape_total", "sesgo_total"]; // sin MAPE
+// sin MAPE; el mes 3 y el MAE, solo si el archivo los trae
+const columnasModelos = (conMesTres) =>
+  conMesTres
+    ? ["wape_m1", "wape_m2", "wape_m3", "wape_total", "sesgo_total", "mae"]
+    : ["wape_m1", "wape_m2", "wape_total", "sesgo_total"];
+const FORMATO_METRICA = { sesgo_total: variacion, mae: (valor) => indice(valor) };
 const CIEN = "100 = semana promedio del total";
 // la primera opción de cada lista del segmentador: el nodo entero
 const TODO = { submarca: "Toda la submarca", departamento: "Todo el departamento", categoria: "Toda la categoría" };
@@ -85,18 +90,39 @@ export function botonExportar(alExportar) {
   return el("div", { clase: "exportar" }, boton);
 }
 
-/** WAPE de mes 1, mes 2 y total, y sesgo total, de cada modelo. El MAPE viene en results.json, pero no se muestra. */
-function tablaEstandar(metricas) {
+/**
+ * WAPE de cada mes y total, y sesgo total, de cada modelo; con `conMesTres`, también el mes 3 y el MAE. El MAPE viene
+ * en results.json, pero no se muestra.
+ */
+function tablaEstandar(metricas, conMesTres = false) {
   const grupo = (texto, columnas) => el("th", { scope: "colgroup", colspan: columnas, clase: "separador" }, texto);
   const columna = (texto, separador = false) => el("th", { scope: "col", clase: separador ? "separador" : null }, texto);
+  const columnas = columnasModelos(conMesTres);
+  const separador = (metrica, i) => i === 0 || metrica === "sesgo_total" || metrica === "mae";
   return el(
     "table",
     {},
     el(
       "thead",
       {},
-      el("tr", {}, el("th", { scope: "col", rowspan: 2 }, "Modelo"), grupo("WAPE", 3), grupo("Sesgo", 1)),
-      el("tr", {}, columna("Mes 1", true), columna("Mes 2"), columna("Total"), columna("Total", true)),
+      el(
+        "tr",
+        {},
+        el("th", { scope: "col", rowspan: 2 }, "Modelo"),
+        grupo("WAPE", conMesTres ? 4 : 3),
+        grupo("Sesgo", 1),
+        conMesTres && grupo("MAE", 1),
+      ),
+      el(
+        "tr",
+        {},
+        columna("Mes 1", true),
+        columna("Mes 2"),
+        conMesTres && columna("Mes 3"),
+        columna("Total"),
+        columna("Total", true),
+        conMesTres && columna("Por mes", true),
+      ),
     ),
     el(
       "tbody",
@@ -106,9 +132,9 @@ function tablaEstandar(metricas) {
           "tr",
           { clase: fila.es_champion ? "fila-champion" : null },
           el("th", { scope: "row" }, nombreModelo(fila)),
-          COLUMNAS_MODELOS.map((metrica, i) =>
-            celdaMetrica(fila[metrica], metrica === "sesgo_total" ? variacion : porcentaje, {
-              clase: i === 0 || metrica === "sesgo_total" ? "separador" : null,
+          columnas.map((metrica, i) =>
+            celdaMetrica(fila[metrica], FORMATO_METRICA[metrica] ?? porcentaje, {
+              clase: separador(metrica, i) ? "separador" : null,
             }),
           ),
         ),
@@ -118,7 +144,7 @@ function tablaEstandar(metricas) {
 }
 
 /**
- * La tabla de modelos de la raíz, la comparación oficial (con el mejor y el champion), y el complemento en un
+ * La tabla de modelos de la versión 1, la comparación oficial (con el mejor y el champion), y el complemento en un
  * desplegable, cada una con su botón para exportar a Excel.
  */
 export function tablaModelos(metricas, { alExportar, alExportarComplemento }) {
@@ -176,9 +202,12 @@ export function tablaModelos(metricas, { alExportar, alExportarComplemento }) {
   return [el("div", { clase: "desplazable" }, estandar), botonExportar(alExportar), nota, complemento].filter(Boolean);
 }
 
-/** La tabla de modelos medida en el nodo elegido (de metricasDelNodo), con su botón para exportar a Excel. */
-export function tablaModelosNodo(metricas, alExportar) {
-  return [el("div", { clase: "desplazable" }, tablaEstandar(metricas)), botonExportar(alExportar)];
+/**
+ * La tabla de modelos de la versión 2, medida en el nodo elegido (de metricasDelNodo), con su botón para exportar a
+ * Excel. Sin "mejor": solo el champion.
+ */
+export function tablaModelosNodo(metricas, { conMesTres, alExportar }) {
+  return [el("div", { clase: "desplazable" }, tablaEstandar(metricas, conMesTres)), botonExportar(alExportar)];
 }
 
 /** Los botones del segmentador: el total y sus hijos (las submarcas). Cada uno lleva el id de su nodo en data-id. */

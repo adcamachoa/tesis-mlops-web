@@ -24,6 +24,7 @@ import {
   semanasGrafica,
   submarcaDe,
   sumarDias,
+  tieneMesTresYMae,
   tienePronosticoAnterior,
   tieneVentaReal,
   urlPronostico,
@@ -50,6 +51,24 @@ function sinVentaReal(resultados) {
   return cambiado(resultados, (r) => {
     delete r.real_hasta;
     for (const serie of r.series) for (const campo of CAMPOS_VENTA_REAL) delete serie[campo];
+  });
+}
+
+const MES_TRES = ["wape_m3", "mape_m3", "mae"];
+
+/** El archivo de la versión 2 con el mes 3 y el MAE en cada nodo, inventados (si ya los trae, se reemplazan). */
+function conMesTres(resultados) {
+  return cambiado(resultados, (r) => {
+    for (const nodo of r.series) {
+      for (const fila of nodo.metricas) Object.assign(fila, { wape_m3: fila.wape_m2, mape_m3: fila.mape_m2, mae: 12.3 });
+    }
+  });
+}
+
+/** El mismo archivo como venían antes en la versión 2: sin el mes 3 ni el MAE. */
+function sinMesTres(resultados) {
+  return cambiado(resultados, (r) => {
+    for (const nodo of r.series) for (const fila of nodo.metricas) for (const m of MES_TRES) delete fila[m];
   });
 }
 
@@ -488,6 +507,47 @@ describe("árbol de la versión 2", () => {
     assert.equal(filas[0].wape_total, nodo.metricas[0].wape_total);
     assert.ok(filas.every((f) => !("es_mejor" in f)), "el mejor solo se marca en la comparación oficial");
   });
+});
+
+describe("mes 3 y MAE de cada nodo", () => {
+  const CON = conMesTres(RECIENTE);
+  const SIN = sinMesTres(RECIENTE);
+
+  test("con el mes 3 y el MAE en cada nodo, el archivo se lee y los trae", () => {
+    assert.equal(revisarResultados(CON), CON);
+    assert.equal(tieneMesTresYMae(CON), true);
+  });
+
+  test("sin ellos, como venían antes en la versión 2, se sigue leyendo", () => {
+    assert.equal(revisarResultados(SIN), SIN);
+    assert.equal(tieneMesTresYMae(SIN), false);
+  });
+
+  test("la versión 1 no los trae", () => {
+    assert.equal(tieneMesTresYMae(RECIENTE_V1), false);
+  });
+
+  test("un MAE vacío es válido, como cualquier métrica que no se puede calcular", () => {
+    assert.doesNotThrow(() => revisarResultados(cambiado(CON, (r) => (r.series[2].metricas[0].mae = null))));
+  });
+
+  const RECHAZOS = {
+    "el mes 3 en un solo nodo": [
+      SIN,
+      (r) => Object.assign(r.series[3].metricas[0], { wape_m3: 0.3, mape_m3: 0.4, mae: 1.2 }),
+      "series/3/metricas/0: trae wape_m3, mape_m3, mae, pero series/0/metricas/0 no: van en todas o en ninguna",
+    ],
+    "un nodo sin el MAE": [CON, (r) => delete r.series[3].metricas[1].mae, "series/3/metricas/1/mae: falta o no es válido"],
+    "un MAE negativo": [CON, (r) => (r.series[2].metricas[0].mae = -1), "series/2/metricas/0/mae: falta o no es válido"],
+    "el WAPE del mes 3 como texto": [
+      CON,
+      (r) => (r.series[2].metricas[0].wape_m3 = "0,3"),
+      "series/2/metricas/0/wape_m3: falta o no es válido",
+    ],
+  };
+  for (const [nombre, [base, cambio, texto]] of Object.entries(RECHAZOS)) {
+    test(`se rechaza: ${nombre}`, () => rechaza(() => revisarResultados(cambiado(base, cambio)), texto));
+  }
 });
 
 describe("versión 1", () => {
