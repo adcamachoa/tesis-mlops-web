@@ -190,10 +190,13 @@ def metricas(origen: date, tm: SimpleNamespace, celda_promedio: float) -> list[d
     return filas
 
 
-def metricas_nodo(nodo, nivel: str, raiz: list[dict], origen: date, tm: SimpleNamespace) -> list[dict]:
+def metricas_nodo(nodo, nivel: str, raiz: list[dict], origen: date, celda: float, tm: SimpleNamespace) -> list[dict]:
     """Las métricas inventadas de un nodo, en el orden de la raíz: el WAPE de cada modelo baja al subir de nivel
-    (WAPE_NIVEL) y varía más en los nodos chicos; el sesgo, como en la raíz, más una variación del nodo."""
+    (WAPE_NIVEL) y varía más en los nodos chicos; el sesgo, como en la raíz, más una variación del nodo. La raíz no trae
+    el mes 3: sale del mes 2, un poco peor. El MAE es el WAPE promedio de los tres meses por `celda`, la venta promedio
+    de un mes del nodo, con los decimales que pide el esquema de tesis-mlops."""
     azar = random.Random(f"{SEMILLA}|nodo|{origen}|{nodo.id}")
+    azar_mes3 = random.Random(f"{SEMILLA}|nodo-mes3|{origen}|{nodo.id}")  # aparte, para no mover las demás
     dispersion = DISPERSION_NIVEL[nivel]
     escala = WAPE_NIVEL[nivel] * azar.lognormvariate(0, dispersion)
     sesgo = azar.gauss(0, dispersion / 2)
@@ -205,7 +208,12 @@ def metricas_nodo(nodo, nivel: str, raiz: list[dict], origen: date, tm: SimpleNa
             **{f"mape_{n}": v * azar.uniform(1.3, 1.6) for n, v in wape.items()},
             "sesgo_total": fila["sesgo_total"] + sesgo + azar.gauss(0, 0.01),
         }
-        redondeados = {m: round(valores[m], DECIMALES_METRICA) for m in tm.esquema.METRICAS_NODO}
+        valores["wape_m3"] = wape["m2"] * azar_mes3.uniform(1.03, 1.1)
+        valores["mape_m3"] = valores["wape_m3"] * azar_mes3.uniform(1.3, 1.6)
+        por_mes = (valores["wape_m1"] + valores["wape_m2"] + valores["wape_m3"]) / 3
+        valores["mae"] = por_mes * celda * azar_mes3.uniform(0.95, 1.05)
+        decimales = {"mae": tm.esquema.DECIMALES_MAE_NODO}
+        redondeados = {m: round(valores[m], decimales.get(m, DECIMALES_METRICA)) for m in tm.esquema.METRICAS_NODO}
         filas.append({"modelo": fila["modelo"], **redondeados})
     return filas
 
@@ -257,11 +265,13 @@ def construir_resultados(origen: date, series: list[dict], tm: SimpleNamespace) 
         nivel = nodo.nivel
         if nivel == tm.arbol.OTRAS:  # se mide como sus hermanos, un nivel debajo de su padre
             nivel = tm.arbol.NIVELES[tm.arbol.NIVELES.index(nivel_de[nodo.padre]) + 1]
+        de_ventanas = suma(ventanas)
+        celda = sum(de_ventanas) / len(de_ventanas)
         return {"id": nodo.id, "padre": nodo.padre, "nivel": nodo.nivel, "nombre": nodo.nombre,
-                "etiqueta": nodo.etiqueta, "real": suma(real), "pronostico": suma(semanal), "ventanas": suma(ventanas),
+                "etiqueta": nodo.etiqueta, "real": suma(real), "pronostico": suma(semanal), "ventanas": de_ventanas,
                 "real_horizonte": suma(real_horizonte, cerradas), "pronostico_anterior": suma(vigente, cubiertas),
                 "ventanas_real": suma(ventanas_real, ventanas_cerradas),
-                "metricas": metricas_nodo(nodo, nivel, raiz, origen, tm)}
+                "metricas": metricas_nodo(nodo, nivel, raiz, origen, celda, tm)}
 
     champion, version = CHAMPION[origen]
     return {

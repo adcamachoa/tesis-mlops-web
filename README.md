@@ -27,7 +27,8 @@ Un pronóstico. Su formato lo define `src/common/results_schema.py` en `tesis-ml
   - **`padre`:** el `id` del padre, o null en el total.
   - **`nivel`:** `total`, `submarca`, `departamento`, `categoria`, `serie` u `otras`.
   - **`nombre`** completo (`Submarca A | Departamento 1`) y **`etiqueta`**, el del nodo solo (`Departamento 1`).
-  - **`metricas`:** el formato estándar de cada modelo en el backtest, con la venta y el pronóstico sumados al nodo, en el orden de `metricas`. No trae el mejor, el champion, el WAPE tipo × mes, el MAE ni el RMSE: esos siguen solo en la `metricas` de arriba, a nivel tipo de producto.
+  - **`metricas`:** el formato estándar de cada modelo en el backtest, con la venta y el pronóstico sumados al nodo, en el orden de `metricas`. No trae el mejor, el champion, el WAPE tipo × mes ni el RMSE: esos siguen solo en la `metricas` de arriba, a nivel tipo de producto.
+    - **Mes 3 y MAE:** llegaron después dentro de la versión 2, con la fase 9e: `wape_m3`, `mape_m3` y `mae`, en todas las filas de todos los nodos. Cualquiera puede ser null. El `mae` va en índice, con 1 decimal, sobre las celdas origen × ventana del backtest con la venta y el pronóstico sumados al nodo: es el error de un mes completo, que se compara con `ventanas` y no con los valores semanales. No es el `mae` de arriba, que promedia celdas serie × ventana. Los archivos de antes no los traen, y la tabla va sin esas columnas.
 - **«Otras»:** junta lo de un padre que no se publica por separado: los grupos que no llegan al mínimo y, si juntos tampoco llegan, el hijo publicado más chico, aunque ese sí llegue. Si un nodo se desglosa, sus hijos lo suman, salvo el redondeo; si eso no se puede sin publicar algo bajo el mínimo, el nodo no se desglosa.
 
 En la versión 2 la página no calcula restos entre nodos: muestra solo lo que viene publicado. Revisa además que los `id` no se repitan, que cada padre venga antes que sus hijos y un nivel arriba, y que cada nodo traiga los modelos de `metricas`.
@@ -98,15 +99,15 @@ Se proponen aquí y se deciden en `tesis-mlops`; la página no inventa campos. L
 
 Una barra bajo el encabezado, fija arriba en escritorio, tiene tres controles:
 
-- **Segmentador de serie:** botones para el total y cada submarca y, debajo, una lista por cada nivel de la ruta elegida: departamento, categoría y tipo de producto en la versión 2, y las series de la submarca en la 1. Cada lista empieza con el nodo entero ("Toda la submarca") y deja «Otras» al final. La serie elegida filtra toda la página, salvo la comparación oficial de modelos.
+- **Segmentador de serie:** botones para el total y cada submarca y, debajo, una lista por cada nivel de la ruta elegida: departamento, categoría y tipo de producto en la versión 2, y las series de la submarca en la 1. Cada lista empieza con el nodo entero ("Toda la submarca") y deja «Otras» al final. La serie elegida filtra toda la página; en la versión 1, salvo la tabla de modelos.
   - **Al cambiar de pronóstico,** la serie se mantiene por su `id`. Si el nuevo no la publica por separado (el árbol se arma en cada origen), se muestra su grupo más cercano que sí está, con un aviso.
 - **Pronóstico:** el origen que se muestra, si hay más de uno.
 - **Tema:** *Sistema*, *Claro* u *Oscuro*. Por defecto sigue al sistema operativo. La elección se guarda solo en el navegador de quien la hace (`localStorage`), y `js/tema.js` la aplica antes de dibujar la página para que no parpadee.
 
 1. **Resumen:** las cifras de la serie elegida en las 13 semanas pronosticadas (semana promedio del pronóstico, la del año anterior y la variación) y los datos de la corrida: modelo champion y versión, fecha del pronóstico, datos hasta, venta real hasta (con cuántas semanas pronosticadas ya la tienen), periodo pronosticado y backtest.
-2. **Modelos en el backtest:** WAPE de mes 1, mes 2 y total, más el sesgo total. El MAPE viene en `results.json`, pero la página no lo muestra.
-   - **Comparación oficial, a nivel tipo de producto:** el backtest completo, con el champion y el mejor marcados, y el complemento (WAPE tipo × mes, MAE y RMSE) en un desplegable. Con ella se elige el modelo, y no cambia con la serie.
-   - **En la serie elegida** (solo en la versión 2): las mismas métricas medidas en ese nodo, con el champion marcado por su nombre y el nivel en el título. Una nota explica que el WAPE baja al subir de nivel, porque al sumar series los errores de signo contrario se compensan, así que no se compara entre niveles.
+2. **Modelos en el backtest.** El MAPE viene en `results.json`, pero la página no lo muestra.
+   - **Versión 2:** una sola tabla, medida en la serie elegida, también en el total: WAPE de mes 1, mes 2, mes 3 y total, sesgo total y MAE. El mes 3 y el MAE van solo si el archivo los trae. El título dice la serie y su nivel, y el champion va marcado por su nombre, sin "mejor". Una nota explica que el WAPE baja al subir de nivel, porque al sumar series los errores de signo contrario se compensan, así que no se compara entre niveles. Otra aclara que el champion se eligió midiendo en cada tipo de producto, así que no siempre tiene el menor WAPE de la tabla.
+   - **Versión 1:** la comparación oficial, a nivel tipo de producto, que no cambia con la serie: WAPE de mes 1, mes 2 y total y sesgo total, con el champion y el mejor marcados, y el complemento (WAPE tipo × mes, MAE y RMSE) en un desplegable.
 3. **Venta real y pronóstico** de la serie elegida: 52 semanas reales, 13 de pronóstico y las mismas semanas del año anterior. Abajo hay una tabla con los datos de la gráfica, en índice.
    - **Venta real después del corte:** la línea sigue hasta `real_hasta`, en las semanas pronosticadas que ya cerraron.
    - **Pronóstico anterior:** en las semanas reales, el pronóstico que estaba vigente, de un origen previo. Va con raya y punto en un azul más tenue que el del pronóstico vigente, que va a rayas. Tiene una casilla en la leyenda y se ve por defecto.
@@ -117,7 +118,7 @@ Una barra bajo el encabezado, fija arriba en escritorio, tiene tres controles:
    - **Versión 2:** un nodo se desglosa en sus hijos tal como vienen, con «Otras» al final, y los hijos lo suman. Un nodo sin hijos no se desglosa; si no es un tipo de producto, una línea lo dice. Una nota explica el mínimo publicado.
    - **Versión 1:** el total se desglosa en sus submarcas, que lo suman. Una submarca se desglosa en sus series principales más "Otras series", que es la submarca menos esas series, porque `results.json` solo trae las 20 de más venta. Una serie no se desglosa.
 
-**Exportar a Excel.** Cada tabla tiene un botón que la descarga como `.xlsx`. Las tablas son la comparación oficial de modelos, las métricas complementarias, los modelos en la serie elegida (versión 2), los datos de la gráfica y el pronóstico por mes.
+**Exportar a Excel.** Cada tabla tiene un botón que la descarga como `.xlsx`. Las tablas son los modelos (en la versión 2, los de la serie elegida; en la 1, la comparación oficial y las métricas complementarias), los datos de la gráfica y el pronóstico por mes.
 
 - **Qué trae cada archivo:** una hoja con las mismas columnas de la página, con los números como números y su formato (índice, %, fechas), y una hoja "Notas" con la tabla, la serie, el pronóstico, la venta real hasta, la escala, el mínimo publicado (versión 2) y la fuente.
 - **Venta real del horizonte:** en el pronóstico por mes, cada periodo lleva tres columnas: pronóstico, venta real y diferencia. Lo que no ha cerrado dice "pendiente".
@@ -162,7 +163,7 @@ npm start     # la página en http://127.0.0.1:8000
 
 `npm start` es necesario porque la página lee los JSON con `fetch`, que no funciona abriendo `index.html` como archivo. En local la página muestra el ejemplo sintético con su aviso, y las pruebas también lo usan: los datos publicados solo se ven en el sitio.
 
-Para regenerar los datos sintéticos hace falta `../tesis-mlops` con la versión 2 del esquema (fase 9c) y Python con pandas, numpy y jsonschema. Con otra copia de `tesis-mlops`, se pasa `--tesis-mlops <carpeta>`:
+Para regenerar los datos sintéticos hace falta `../tesis-mlops` con la versión 2 del esquema y el mes 3 y el MAE en cada nodo (fase 9e) y Python con pandas, numpy y jsonschema. Con otra copia de `tesis-mlops`, se pasa `--tesis-mlops <carpeta>`:
 
 ```
 python herramientas/generar_ejemplo.py
@@ -172,7 +173,7 @@ El ejemplo simula la exportación del lunes 2-nov-2026, con venta real hasta el 
 
 - **Origen 12-oct:** 2 semanas pronosticadas con venta real, ningún mes cerrado y 4 semanas de pronóstico anterior, que viene del origen 14-sep.
 - **Origen 14-sep:** 6 semanas con venta real, el mes 1 cerrado y sin pronóstico anterior.
-- **El árbol** sale de `common.arbol` de `tesis-mlops`, como en la exportación, con unos 100 nodos por origen. Trae los casos que la página tiene que mostrar: un padre con «Otras», una categoría que no se desglosa y un tipo de producto nuevo que llega al mínimo el 12-oct y no el 14-sep. Las métricas por nodo son inventadas, con un WAPE que baja al subir de nivel como en dev.
+- **El árbol** sale de `common.arbol` de `tesis-mlops`, como en la exportación, con unos 100 nodos por origen. Trae los casos que la página tiene que mostrar: un padre con «Otras», una categoría que no se desglosa y un tipo de producto nuevo que llega al mínimo el 12-oct y no el 14-sep. Las métricas por nodo son inventadas, con un WAPE que baja al subir de nivel como en dev. El mes 3 y el MAE van solo si el esquema de `tesis-mlops` los pide.
 - **Los `results.json` van compactos,** como los publica `tesis-mlops`.
 
 El script valida cada `results.json` con `validar` de `tesis-mlops` antes de escribir. Además revisa que estén esos casos y que en cada desglose los hijos sumen el padre. Si algo falla, no escribe nada. De `tesis-mlops` solo lee, sin dejar `__pycache__` allá.
@@ -198,5 +199,5 @@ El ejemplo de la versión 1 quedó fijo en `pruebas/datos/v1/`, como lo generaba
 
 ## Estado
 
-- **Hecho:** la página publicada muestra los pronósticos que publica `tesis-mlops`; en local, el ejemplo sintético. Desde el 29-oct-2026 el sitio muestra la versión 2 de `results.json`, el árbol de la fase 9c. La página sigue leyendo también la versión 1.
+- **Hecho:** la página publicada muestra los pronósticos que publica `tesis-mlops`; en local, el ejemplo sintético. Desde el 29-oct-2026 el sitio muestra la versión 2 de `results.json`, el árbol de la fase 9c. Desde la fase 9e (6-nov-2026), cada nodo trae además el WAPE y el MAPE del mes 3 y el MAE, y la tabla de modelos sigue a la serie elegida. La página sigue leyendo también la versión 1.
 - **Pendiente con `tesis-mlops`:** nada. La propuesta de arriba es una idea para una versión futura, no un compromiso.

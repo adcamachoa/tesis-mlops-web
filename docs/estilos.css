@@ -455,17 +455,6 @@ code {
 
 /* Modelos: la comparación oficial y, debajo, la tabla medida en la serie elegida */
 
-.subtitulo-modelos {
-  margin: 0 0 8px;
-  font-size: 1rem;
-}
-
-.modelos-nodo {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--cuadricula);
-}
-
 /* las cifras de la serie elegida van más grandes que los datos de la corrida */
 .resumen-serie dd {
   font-size: 1.6rem;

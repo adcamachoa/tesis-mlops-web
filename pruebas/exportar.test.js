@@ -35,6 +35,18 @@ function sinVentaReal(resultados) {
 }
 const VIEJO = sinVentaReal(V1);
 
+/** El archivo de la versión 2 con el mes 3 y el MAE en cada nodo (inventados) o sin ellos, como venían antes. */
+function conMesTres(resultados, con) {
+  const copia = structuredClone(resultados);
+  for (const nodo of copia.series) {
+    for (const fila of nodo.metricas) {
+      if (con) Object.assign(fila, { wape_m3: fila.wape_m2 + 0.01, mape_m3: fila.mape_m2, mae: 12.3 });
+      else for (const m of ["wape_m3", "mape_m3", "mae"]) delete fila[m];
+    }
+  }
+  return copia;
+}
+
 test("los nombres de archivo van sin tildes, en minúsculas y con guiones", () => {
   assert.equal(
     enArchivo("Submarca A | Departamento 1 | Categoría 1.4 | Tipo 16"),
@@ -64,17 +76,30 @@ test("la comparación oficial de modelos se exporta sin MAPE, con porcentajes y 
 });
 
 test("la tabla de modelos de la serie elegida se exporta con su nivel, el champion y sin MAPE ni el mejor", () => {
-  const nodo = RESULTADOS.series.find((s) => s.nivel === "departamento");
-  const exportado = exportarModelosNodo(RESULTADOS, nodo);
+  const resultados = conMesTres(RESULTADOS, false);
+  const nodo = resultados.series.find((s) => s.nivel === "departamento");
+  const exportado = exportarModelosNodo(resultados, nodo);
   assert.equal(exportado.archivo, `modelos_${enArchivo(nodo.nombre)}_2026-10-12.xlsx`);
   const [encabezado, ...filas] = exportado.hojas[0].filas;
   assert.deepEqual(encabezado, ["Modelo", "Champion", "WAPE mes 1", "WAPE mes 2", "WAPE total", "Sesgo total"]);
-  const esperadas = metricasDelNodo(RESULTADOS, nodo);
+  const esperadas = metricasDelNodo(resultados, nodo);
   assert.deepEqual(filas.map((f) => f[0]), esperadas.map((f) => f.modelo));
-  assert.deepEqual(filas.filter((f) => f[1] === "sí").map((f) => f[0]), [RESULTADOS.champion.modelo]);
+  assert.deepEqual(filas.filter((f) => f[1] === "sí").map((f) => f[0]), [resultados.champion.modelo]);
   assert.deepEqual(filas[0][4], { valor: nodo.metricas[0].wape_total, formato: "porcentaje" });
   assert.equal(notas(exportado).Tabla, "Modelos en el backtest, medidos en la serie elegida (nivel departamento)");
   assert.equal(notas(exportado).Serie, nodo.nombre.split(" | ").join(" › "));
+});
+
+test("con el mes 3 y el MAE, la tabla de la serie los exporta como en la página", () => {
+  const resultados = conMesTres(RESULTADOS, true);
+  const nodo = resultados.series.find((s) => s.nivel === "submarca");
+  const [encabezado, primera] = exportarModelosNodo(resultados, nodo).hojas[0].filas;
+  assert.deepEqual(encabezado, [
+    "Modelo", "Champion", "WAPE mes 1", "WAPE mes 2", "WAPE mes 3", "WAPE total", "Sesgo total", "MAE por mes (índice)",
+  ]);
+  assert.deepEqual(primera[4], { valor: nodo.metricas[0].wape_m3, formato: "porcentaje" });
+  assert.deepEqual(primera[7], { valor: 12.3, formato: "indice" });
+  assert.match(notas(exportarModelosNodo(resultados, nodo)).Tabla, /\(nivel submarca\)\. El MAE es el error promedio/);
 });
 
 test("sin datos sintéticos, las notas no llevan el aviso", () => {

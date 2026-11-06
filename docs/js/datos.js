@@ -11,7 +11,8 @@
 //
 // La venta real del horizonte (real_hasta y, en cada serie, real_horizonte, ventanas_real y pronostico_anterior) llegó
 // después dentro de la versión 1: los archivos de antes no la traen y la página se ve como antes (ver tieneVentaReal).
-// En la versión 2 siempre viene.
+// En la versión 2 siempre viene. El WAPE y el MAPE del mes 3 y el MAE de cada nodo llegaron después dentro de la 2
+// (ver tieneMesTresYMae).
 
 export const VERSION_MANIFEST = 1;
 export const VERSIONES_ESQUEMA = [1, 2];
@@ -21,6 +22,7 @@ const NIVELES_V1 = ["total", "submarca", "serie"];
 export const NIVELES = ["total", "submarca", "departamento", "categoria", "serie"]; // los de la versión 2
 const OTRAS = "otras"; // junta lo de un padre que no se publica por separado; no se desglosa
 const CAMPOS_VENTA_REAL = ["real_horizonte", "ventanas_real", "pronostico_anterior"]; // en cada serie, con real_hasta
+const METRICAS_NODO_NUEVAS = ["wape_m3", "mape_m3", "mae"]; // en las métricas de cada nodo: en todas o en ninguna
 const DIAS_ANIO = 364; // 52 semanas: la misma semana del año anterior, también de lunes a domingo
 
 const ID = /^[a-z0-9-]+$/;
@@ -119,6 +121,13 @@ function revisarArbol(problemas, nodos) {
 
 /** Si el archivo trae la venta real del horizonte. Los de antes no la traen, y la página se ve como antes. */
 export const tieneVentaReal = (resultados) => "real_hasta" in resultados;
+
+/**
+ * Si las métricas de los nodos traen el WAPE y el MAPE del mes 3 y el MAE. Los archivos de la versión 2 de antes no los
+ * traen, y la tabla de modelos va sin esas columnas.
+ */
+export const tieneMesTresYMae = (resultados) =>
+  resultados.version_esquema === 2 && METRICAS_NODO_NUEVAS.some((m) => m in resultados.series[0].metricas[0]);
 
 /**
  * Qué semanas y qué meses del pronóstico ya cerraron hasta real_hasta (el último domingo con venta real): ahí va la
@@ -253,6 +262,10 @@ export function revisarResultados(resultados, entrada = null) {
     conVentaReal && esFecha(hasta) && conSemanas && conVentanas && resultados.ventanas.every(esObjeto)
       ? cerrados(resultados)
       : null;
+  // el WAPE y el MAPE del mes 3 y el MAE de cada nodo: en todas las filas o en ninguna, como diga la primera
+  const primera = version === 2 ? resultados.series?.[0]?.metricas?.[0] : null;
+  const conMesTres = esObjeto(primera) && METRICAS_NODO_NUEVAS.some((m) => m in primera);
+  const mesTres = { wape_m3: esMetrica, mape_m3: esMetrica, mae: (v) => v === null || esIndice(v) };
   const camposNodo =
     version === 1
       ? { nivel: (v) => NIVELES_V1.includes(v), nombre: esTexto }
@@ -266,9 +279,15 @@ export function revisarResultados(resultados, entrada = null) {
   revisarLista(problemas, "series", resultados.series, (serie, ruta) => {
     if (!revisarCampos(problemas, ruta, serie, camposNodo)) return;
     if (version === 2) {
-      const conModelos = revisarLista(problemas, `${ruta}/metricas`, serie.metricas, (fila, rutaFila) =>
-        revisarCampos(problemas, rutaFila, fila, { modelo: esTexto, ...estandar }),
-      );
+      const conModelos = revisarLista(problemas, `${ruta}/metricas`, serie.metricas, (fila, rutaFila) => {
+        if (!revisarCampos(problemas, rutaFila, fila, { modelo: esTexto, ...estandar, ...(conMesTres && mesTres) })) {
+          return;
+        }
+        const sueltas = conMesTres ? [] : METRICAS_NODO_NUEVAS.filter((m) => m in fila);
+        if (sueltas.length) {
+          problemas.push(`${rutaFila}: trae ${sueltas.join(", ")}, pero series/0/metricas/0 no: van en todas o en ninguna`);
+        }
+      });
       if (conModelos && modelos && JSON.stringify(serie.metricas.map((fila) => fila?.modelo)) !== modelos) {
         problemas.push(`${ruta}/metricas: no trae los mismos modelos que metricas, en el mismo orden`);
       }
